@@ -82,6 +82,8 @@ export interface NetServiceShape {
   readonly findAvailablePort: (preferred: number) => Effect.Effect<number, NetError>;
 }
 
+type LoopbackProbeResult = "available" | "unavailable" | "unsupported";
+
 /**
  * NetService - Service tag for startup networking helpers.
  */
@@ -94,12 +96,12 @@ export class NetService extends ServiceMap.Service<NetService, NetServiceShape>(
      * `EADDRNOTAVAIL` is treated as available so IPv6-absent hosts don't fail
      * loopback availability checks.
      */
-    const canListenOnHost = (port: number, host: string): Effect.Effect<boolean> =>
-      Effect.callback<boolean>((resume) => {
+    const probeLoopbackHost = (port: number, host: string): Effect.Effect<LoopbackProbeResult> =>
+      Effect.callback<LoopbackProbeResult>((resume) => {
         const server = Net.createServer();
         let settled = false;
 
-        const settle = (value: boolean) => {
+        const settle = (value: LoopbackProbeResult) => {
           if (settled) return;
           settled = true;
           resume(Effect.succeed(value));
@@ -109,15 +111,15 @@ export class NetService extends ServiceMap.Service<NetService, NetServiceShape>(
 
         server.once("error", (cause) => {
           if (isErrnoExceptionWithCode(cause) && cause.code === "EADDRNOTAVAIL") {
-            settle(true);
+            settle("unsupported");
             return;
           }
-          settle(false);
+          settle("unavailable");
         });
 
         server.once("listening", () => {
           server.close(() => {
-            settle(true);
+            settle("available");
           });
         });
 
@@ -127,6 +129,9 @@ export class NetService extends ServiceMap.Service<NetService, NetServiceShape>(
           closeServer(server);
         });
       });
+
+    const canListenOnHost = (port: number, host: string): Effect.Effect<boolean> =>
+      Effect.map(probeLoopbackHost(port, host), (result) => result !== "unavailable");
 
     /**
      * Reserve an ephemeral loopback port and release it immediately.
@@ -167,13 +172,14 @@ export class NetService extends ServiceMap.Service<NetService, NetServiceShape>(
     return {
       canListenOnHost,
       isPortAvailableOnLoopback: (port) =>
-        Effect.zipWith(
-          canListenOnHost(port, "127.0.0.1"),
-          canListenOnHost(port, "::1"),
-          // Treat a port as usable when either loopback family is available.
-          // Requiring both can incorrectly reject healthy dev setups on
-          // machines where IPv6 loopback binding is disabled or restricted.
-          (ipv4, ipv6) => ipv4 || ipv6,
+        Effect.all([probeLoopbackHost(port, "127.0.0.1"), probeLoopbackHost(port, "::1")]).pipe(
+          Effect.map(([ipv4, ipv6]) => {
+            if (ipv4 === "unavailable" || ipv6 === "unavailable") {
+              return false;
+            }
+
+            return ipv4 === "available" || ipv6 === "available";
+          }),
         ),
       reserveLoopbackPort,
       findAvailablePort: (preferred) =>

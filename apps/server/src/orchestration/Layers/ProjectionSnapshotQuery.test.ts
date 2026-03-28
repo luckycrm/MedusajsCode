@@ -36,6 +36,9 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
           workspace_root,
           default_model_selection_json,
           scripts_json,
+          skills_json,
+          knowledge_sources_json,
+          mcp_servers_json,
           created_at,
           updated_at,
           deleted_at
@@ -46,6 +49,9 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
           '/tmp/project-1',
           '{"provider":"codex","model":"gpt-5-codex"}',
           '[{"id":"script-1","name":"Build","command":"bun run build","icon":"build","runOnWorktreeCreate":false}]',
+          '[]',
+          '[]',
+          '[]',
           '2026-02-24T00:00:00.000Z',
           '2026-02-24T00:00:01.000Z',
           NULL
