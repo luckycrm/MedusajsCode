@@ -1,31 +1,55 @@
-# MedusaJS Code
+<div align="center">
+  <img src="./apps/marketing/public/icon.png" width="120" alt="MedusaJS Code Logo" />
+  <h1>MedusaJS Code</h1>
+  <p><strong>The premier desktop AI assistant for MedusaJS developers.</strong></p>
+</div>
 
-MedusaJS Code is an early WIP, lightning-fast desktop AI coding assistant specifically designed to help you build **high-quality MedusaJS frontends and backends** faster than ever. It acts as a minimal web GUI for powerful coding agents (currently Codex and Claude, with more coming soon), giving you predictable, reliable AI assistance tailored for real, complex Medusa codebases.
+<p align="center">
+  <a href="https://medusajscode.pages.dev/">🌐 Website & Download</a> •
+  <a href="./CONTRIBUTING.md">🤝 Contribute</a>
+</p>
+
+---
+
+## Overview
+
+**MedusaJS Code** is an early WIP, lightning-fast desktop AI coding assistant specifically designed to help you build **high-quality MedusaJS frontends and backends** faster than ever. It acts as a minimal web GUI for powerful coding agents (currently Codex and Claude, with more coming soon), giving you predictable, reliable AI assistance tailored for real, complex Medusa codebases.
+
+![MedusaJS Code Screenshot](./apps/marketing/public/screenshot.png)
+
+## Why MedusaJS Code?
+
+- **Medusa-Optimized:** Built from the ground up to handle the complexity of MedusaJS e-commerce architectures, custom API routes, and storefronts.
+- **Agent Integrations:** Direct UI support for OpenAI's Codex and Anthropic's Claude.
+- **Lightning Fast:** Native desktop performance on macOS, Windows, and Linux.
+- **Predictable:** Correctness-first approach ensuring reliable session recovery and safe project access.
+
 ## How to use
 
 > [!WARNING]
 > You need to have [Codex CLI](https://github.com/openai/codex) installed and authorized for MedusaJS Code to work.
 
+If you don't use the compiled desktop version, you can run it via the CLI:
 ```bash
 npx medusajscode
 ```
 
-You can also just install the desktop app. It's cooler.
+However, we recommend running the highly-optimized **Desktop App**.
 
-Install the [desktop app from the Releases page](https://github.com/luckycrm/medusajscode/releases)
+📥 **[Download MedusaJS Code Desktop](https://medusajscode.pages.dev/)**
 
-## Some notes
+*(Or grab the raw binaries from our [GitHub Releases page](https://github.com/luckycrm/medusajscode/releases))*
 
-We are very very early in this project. Expect bugs.
+## Current Status
 
-We are not accepting contributions yet.
+We are **very very early** in this project. Expect bugs.
+
+We are not actively accepting large contributions immediately, but bug reports and feature ideas are extremely welcome!
 
 ## If you REALLY want to contribute still.... read this first
 
 Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening an issue or PR.
 
-
-
 ## Acknowledgements
 
-This project is a fork of [T3 Code](https://github.com/pingdotgg/t3code) by [ping.gg](https://ping.gg). I would like to extend our gratitude to the original authors for their incredible work and foundation.
+This project is a fork of [T3 Code](https://github.com/pingdotgg/t3code) by [ping.gg](https://ping.gg). We would like to extend our immense gratitude to the original authors for their incredible work and the technical foundation of this project.
