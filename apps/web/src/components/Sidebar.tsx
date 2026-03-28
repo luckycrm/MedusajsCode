@@ -1811,7 +1811,8 @@ export default function Sidebar() {
                         render={
                           <button
                             type="button"
-                            aria-label="New chat"
+                            aria-label="New thread"
+                            data-testid="new-thread-button"
                             className="inline-flex size-5 cursor-pointer items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
                             onClick={() => {
                               void handleNewThread(activeProjectId, {
@@ -1827,8 +1828,8 @@ export default function Sidebar() {
                       </TooltipTrigger>
                       <TooltipPopup side="right">
                         {newThreadShortcutLabel
-                          ? `New chat (${newThreadShortcutLabel})`
-                          : "New chat"}
+                          ? `New thread (${newThreadShortcutLabel})`
+                          : "New thread"}
                       </TooltipPopup>
                     </Tooltip>
                   ) : null}
