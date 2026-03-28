@@ -8,7 +8,7 @@ MedusaJS Code is a minimal web GUI for coding agents (currently Codex and Claude
 > You need to have [Codex CLI](https://github.com/openai/codex) installed and authorized for MedusaJS Code to work.
 
 ```bash
-npx mc
+npx medusajscode
 ```
 
 You can also just install the desktop app. It's cooler.

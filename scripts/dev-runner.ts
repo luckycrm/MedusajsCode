@@ -25,10 +25,10 @@ const MODE_ARGS = {
     "--ui=tui",
     "--filter=@mctools/contracts",
     "--filter=@mctools/web",
-    "--filter=mc",
+    "--filter=medusajscode",
     "--parallel",
   ],
-  "dev:server": ["run", "dev", "--filter=mc"],
+  "dev:server": ["run", "dev", "--filter=medusajscode"],
   "dev:web": ["run", "dev", "--filter=@mctools/web"],
   "dev:desktop": ["run", "dev", "--filter=@mctools/desktop", "--filter=@mctools/web", "--parallel"],
 } as const satisfies Record<string, ReadonlyArray<string>>;

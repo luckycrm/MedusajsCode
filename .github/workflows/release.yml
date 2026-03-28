@@ -251,9 +251,11 @@ jobs:
         run: node scripts/update-release-package-versions.ts "${{ needs.preflight.outputs.version }}"
 
       - name: Build CLI package
-        run: bun run build --filter=@mctools/web --filter=mc
+        run: bun run build --filter=@mctools/web --filter=medusajscode
 
       - name: Publish CLI package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: node apps/server/scripts/cli.ts publish --tag latest --app-version "${{ needs.preflight.outputs.version }}" --verbose
 
   release:

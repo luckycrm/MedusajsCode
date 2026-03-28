@@ -1,5 +1,5 @@
 {
-  "name": "mc",
+  "name": "medusajscode",
   "version": "0.1",
   "license": "MIT",
   "repository": {
@@ -8,7 +8,7 @@
     "directory": "apps/server"
   },
   "bin": {
-    "mc": "./dist/index.mjs"
+    "medusajscode": "./dist/index.mjs"
   },
   "files": [
     "dist"

@@ -11,12 +11,12 @@
       "persistent": true,
     },
     "start": {
-      "dependsOn": ["build", "@mctools/web#build", "mc#build"],
+      "dependsOn": ["build", "@mctools/web#build", "medusajscode#build"],
       "cache": false,
       "persistent": true,
     },
     "smoke-test": {
-      "dependsOn": ["build", "@mctools/web#build", "mc#build"],
+      "dependsOn": ["build", "@mctools/web#build", "medusajscode#build"],
       "cache": false,
       "outputs": [],
     },
