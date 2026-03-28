@@ -1,6 +1,6 @@
 {
   "name": "@mctools/web",
-  "version": "0.1",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -21,9 +21,9 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@formkit/auto-animate": "^0.9.0",
     "@lexical/react": "^0.41.0",
-    "@pierre/diffs": "^1.1.0-beta.16",
     "@mctools/contracts": "workspace:*",
     "@mctools/shared": "workspace:*",
+    "@pierre/diffs": "^1.1.0-beta.16",
     "@tanstack/react-pacer": "^0.19.4",
     "@tanstack/react-query": "^5.90.0",
     "@tanstack/react-router": "^1.160.2",

@@ -14,6 +14,7 @@
     },
     "apps/desktop": {
       "name": "@mctools/desktop",
+      "version": "0.1.1",
       "dependencies": {
         "effect": "catalog:",
         "electron": "41.0.1",
@@ -42,6 +43,7 @@
     },
     "apps/server": {
       "name": "medusajscode",
+      "version": "0.1.1",
       "bin": {
         "medusajscode": "./dist/index.mjs",
       },
@@ -71,6 +73,7 @@
     },
     "apps/web": {
       "name": "@mctools/web",
+      "version": "0.1.1",
       "dependencies": {
         "@base-ui/react": "^1.2.0",
         "@dnd-kit/core": "^6.3.1",
@@ -121,6 +124,7 @@
     },
     "packages/contracts": {
       "name": "@mctools/contracts",
+      "version": "0.1.1",
       "dependencies": {
         "effect": "catalog:",
       },
