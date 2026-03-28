@@ -20,7 +20,10 @@ function splitPath(pathValue: string) {
   const segments = normalized.split("/").filter(Boolean);
   return {
     name: segments[segments.length - 1] ?? pathValue,
-    parent: segments.length > 1 ? `~/${segments.slice(0, -1).join("/")}`.replace(/^~\/Users\/[^/]+/, "~") : "",
+    parent:
+      segments.length > 1
+        ? `~/${segments.slice(0, -1).join("/")}`.replace(/^~\/Users\/[^/]+/, "~")
+        : "",
   };
 }
 
@@ -36,7 +39,9 @@ function ChatIndexRouteView() {
       .map((project) => {
         const projectThreadTimes = threads
           .filter((thread) => thread.projectId === project.id)
-          .map((thread) => Math.max(normalizeDate(thread.updatedAt), normalizeDate(thread.createdAt)));
+          .map((thread) =>
+            Math.max(normalizeDate(thread.updatedAt), normalizeDate(thread.createdAt)),
+          );
         const lastActivity = Math.max(
           normalizeDate(project.updatedAt),
           normalizeDate(project.createdAt),
@@ -173,7 +178,9 @@ function ChatIndexRouteView() {
 
           {starterTemplates.length > 0 && (
             <section className="mt-8 w-full pt-2">
-              <div className="mb-3 text-sm font-semibold text-foreground">Clone Starter Templates</div>
+              <div className="mb-3 text-sm font-semibold text-foreground">
+                Clone Starter Templates
+              </div>
               <div className="grid gap-3 md:grid-cols-3">
                 {starterTemplates.map((template) => (
                   <button
@@ -210,7 +217,9 @@ function ChatIndexRouteView() {
                         ) : null}
                       </div>
                       <div className="mt-auto pt-3 text-xs text-muted-foreground">
-                        {busyTemplateId === template.id ? "Choosing destination..." : "Use template"}
+                        {busyTemplateId === template.id
+                          ? "Choosing destination..."
+                          : "Use template"}
                       </div>
                     </div>
                   </button>

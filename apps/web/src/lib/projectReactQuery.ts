@@ -4,6 +4,10 @@ import { ensureNativeApi } from "~/nativeApi";
 
 export const projectQueryKeys = {
   all: ["projects"] as const,
+  listDirectory: (cwd: string | null, relativePath?: string | null) =>
+    ["projects", "list-directory", cwd, relativePath ?? null] as const,
+  readFile: (cwd: string | null, relativePath?: string | null) =>
+    ["projects", "read-file", cwd, relativePath ?? null] as const,
   searchEntries: (cwd: string | null, query: string, limit: number) =>
     ["projects", "search-entries", cwd, query, limit] as const,
 };

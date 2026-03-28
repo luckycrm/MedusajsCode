@@ -1,14 +1,34 @@
 import { ThreadId, type EditorId, type ResolvedKeybindingsConfig } from "@mctools/contracts";
 import { useQuery } from "@tanstack/react-query";
-import { Outlet, createFileRoute, useLocation, useNavigate, useParams } from "@tanstack/react-router";
-import { ArrowLeftIcon, PanelRightCloseIcon, PanelRightIcon, SettingsIcon, TerminalSquareIcon } from "lucide-react";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  Outlet,
+  createFileRoute,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "@tanstack/react-router";
+import {
+  ArrowLeftIcon,
+  PanelRightCloseIcon,
+  PanelRightIcon,
+  SettingsIcon,
+  TerminalSquareIcon,
+} from "lucide-react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
 import ProjectExplorerSidebar, {
   ProjectExplorerProvider,
 } from "../components/ProjectExplorerSidebar";
 import ThreadSidebar from "../components/Sidebar";
-import GitActionsControl from "../components/GitActionsControl";
+import { ProjectFileEditorProvider } from "../components/ProjectFileEditor";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { useProjectStarter } from "../hooks/useProjectStarter";
 import { isTerminalFocused } from "../lib/terminalFocus";
@@ -23,6 +43,7 @@ import { ProjectExplorerTrigger } from "~/components/ProjectExplorerSidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { isElectron } from "~/env";
 import { useSettings } from "~/hooks/useSettings";
+import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { Sidebar, SidebarProvider, SidebarRail, useSidebar } from "~/components/ui/sidebar";
 
@@ -65,7 +86,9 @@ function GlobalFooterWordmark() {
       <span className="truncate text-[0.9rem] font-black tracking-[-0.06em] text-foreground">
         MedusaJS
       </span>
-      <span className="truncate text-xs font-medium tracking-tight text-muted-foreground">Code</span>
+      <span className="truncate text-xs font-medium tracking-tight text-muted-foreground">
+        Code
+      </span>
     </div>
   );
 }
@@ -79,7 +102,7 @@ function ChatSidebarHeaderTrigger() {
       type="button"
       variant="ghost"
       size="icon"
-      className="size-7 shrink-0"
+      className={isExpanded ? "size-7 shrink-0 text-primary" : "size-7 shrink-0"}
       aria-label="Toggle chats sidebar"
       onClick={() => {
         if (isMobile) {
@@ -89,7 +112,11 @@ function ChatSidebarHeaderTrigger() {
         setOpen(!open);
       }}
     >
-      {isExpanded ? <PanelRightCloseIcon className="size-4" /> : <PanelRightIcon className="size-4" />}
+      {isExpanded ? (
+        <PanelRightCloseIcon className="size-4" />
+      ) : (
+        <PanelRightIcon className="size-4" />
+      )}
     </Button>
   );
 }
@@ -182,14 +209,16 @@ function ChatRouteLayout() {
     strict: false,
     select: (params) => (params.threadId ? ThreadId.makeUnsafe(params.threadId) : null),
   });
+  const isSettingsRoute = location.pathname === "/settings";
   const terminalOpen = useTerminalStateStore((state) =>
     routeThreadId
       ? selectThreadTerminalState(state.terminalStateByThreadId, routeThreadId).terminalOpen
       : false,
   );
   const shouldShowProjectExplorer = routeThreadId !== null;
-  const activeProject =
-    activeThread ? projects.find((project) => project.id === activeThread.projectId) ?? null : null;
+  const activeProject = activeThread
+    ? (projects.find((project) => project.id === activeThread.projectId) ?? null)
+    : null;
   const [headerContent, setHeaderContentState] = useState<ReactNode>(null);
   const [footerContent, setFooterContentState] = useState<ReactNode>(null);
   const setHeaderContent = useCallback((content: ReactNode) => {
@@ -252,144 +281,150 @@ function ChatRouteLayout() {
   return (
     <GlobalHeaderContentContext.Provider value={globalHeaderContentValue}>
       <GlobalFooterContentContext.Provider value={globalFooterContentValue}>
-      <ProjectExplorerProvider>
-        <SidebarProvider defaultOpen>
-          <ChatRouteGlobalShortcuts />
-          <div className={`flex min-h-svh w-full flex-1 flex-col ${isElectron ? "pb-[40px]" : ""}`}>
-          {isElectron ? (
-            <div className="drag-region relative flex h-[52px] shrink-0 items-center border-b border-border bg-background px-5 pl-[90px]">
-              <div className="pointer-events-none absolute left-1/2 flex max-w-[min(38vw,30rem)] -translate-x-1/2 items-center gap-2 px-4">
-                <span
-                  className="truncate text-center text-xs font-medium tracking-wide text-muted-foreground/70"
-                  title={activeThread?.title ?? "No active thread"}
-                >
-                  {activeThread?.title ?? "No active thread"}
-                </span>
-                {activeProject ? (
-                  <span
-                    className="shrink-0 rounded-full border border-border bg-muted/55 px-2 py-0.5 text-[10px] font-medium text-muted-foreground/85"
-                    title={activeProject.name}
-                  >
-                    {activeProject.name}
-                  </span>
-                ) : null}
-              </div>
-              <div className="ms-auto flex min-w-0 max-w-[calc(100%-10rem)] items-center justify-end gap-2 [-webkit-app-region:no-drag]">
-                {headerContent ? (
-                  <div className="flex shrink-0 items-center gap-2">
-                    {headerContent}
+        <ProjectExplorerProvider>
+          <ProjectFileEditorProvider>
+            <SidebarProvider defaultOpen>
+              <ChatRouteGlobalShortcuts />
+              <div
+                className={`flex min-h-svh w-full flex-1 flex-col ${isElectron ? "pb-[40px]" : ""}`}
+              >
+                {isElectron ? (
+                  <div className="drag-region relative flex h-[52px] shrink-0 items-center border-b border-border bg-background px-5 pl-[90px]">
+                    <div className="pointer-events-none absolute left-1/2 flex max-w-[min(38vw,30rem)] -translate-x-1/2 items-center gap-2 px-4">
+                      <span
+                        className="truncate text-center text-xs font-medium tracking-wide text-muted-foreground/70"
+                        title={activeThread?.title ?? "No active thread"}
+                      >
+                        {activeThread?.title ?? "No active thread"}
+                      </span>
+                      {activeProject ? (
+                        <span
+                          className="shrink-0 rounded-full border border-border bg-muted/55 px-2 py-0.5 text-[10px] font-medium text-muted-foreground/85"
+                          title={activeProject.name}
+                        >
+                          {activeProject.name}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="ms-auto flex min-w-0 max-w-[calc(100%-10rem)] items-center justify-end gap-2 [-webkit-app-region:no-drag]">
+                      {headerContent ? (
+                        <div className="flex shrink-0 items-center gap-2">{headerContent}</div>
+                      ) : null}
+                      {activeProject ? (
+                        <div className="flex shrink-0 items-center gap-2">
+                          <OpenInPicker
+                            keybindings={keybindings}
+                            availableEditors={availableEditors}
+                            openInCwd={activeProject.cwd}
+                            forceExpanded
+                          />
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 ) : null}
-                {activeProject ? (
-                  <div className="flex shrink-0 items-center gap-2">
-                    <OpenInPicker
-                      keybindings={keybindings}
-                      availableEditors={availableEditors}
-                      openInCwd={activeProject.cwd}
-                    />
-                    {activeThread ? (
-                      <GitActionsControl
-                        gitCwd={activeProject.cwd}
-                        activeThreadId={activeThread.id}
-                      />
-                    ) : null}
-                  </div>
-                ) : null}
-                <div className="flex shrink-0 items-center gap-1">
-                  {activeProject ? (
-                    <Tooltip>
-                      <TooltipTrigger
-                        render={
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="size-7 shrink-0"
-                            aria-label="Toggle terminal drawer"
-                            onClick={() => {
-                              window.dispatchEvent(new Event(TOGGLE_TERMINAL_DRAWER_EVENT));
-                            }}
-                          >
-                            <TerminalSquareIcon
-                              className={`size-4 ${
-                                terminalOpen ? "text-foreground" : "text-muted-foreground"
-                              }`}
-                            />
-                          </Button>
-                        }
-                      />
-                      <TooltipPopup side="bottom">Toggle terminal drawer</TooltipPopup>
-                    </Tooltip>
+                <div className="flex min-h-0 flex-1 overflow-hidden">
+                  {shouldShowProjectExplorer && !isSettingsRoute ? (
+                    <ProjectExplorerSidebar topControls={footerContent} />
                   ) : null}
-                  {shouldShowProjectExplorer ? <ProjectExplorerTrigger /> : null}
-                  <ChatSidebarHeaderTrigger />
+                  {isSettingsRoute ? (
+                    <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+                      <Outlet />
+                    </div>
+                  ) : (
+                    <Outlet />
+                  )}
+                  {!isSettingsRoute ? (
+                    <Sidebar
+                      side="right"
+                      collapsible="offcanvas"
+                      className={`border-l border-border bg-card text-foreground ${
+                        isElectron ? "md:top-[52px] md:bottom-[40px] md:h-[calc(100svh-92px)]" : ""
+                      }`}
+                      resizable={{
+                        minWidth: THREAD_SIDEBAR_MIN_WIDTH,
+                        shouldAcceptWidth: ({ nextWidth, wrapper }) =>
+                          wrapper.clientWidth - nextWidth >=
+                          THREAD_MAIN_CONTENT_MIN_WIDTH +
+                            (shouldShowProjectExplorer ? PROJECT_EXPLORER_WIDTH : 0),
+                        storageKey: THREAD_SIDEBAR_WIDTH_STORAGE_KEY,
+                      }}
+                    >
+                      <ThreadSidebar />
+                      <SidebarRail />
+                    </Sidebar>
+                  ) : null}
                 </div>
-              </div>
-            </div>
-          ) : null}
-          <div className="flex min-h-0 flex-1 overflow-hidden">
-            {shouldShowProjectExplorer ? <ProjectExplorerSidebar /> : null}
-            <Outlet />
-            <Sidebar
-              side="right"
-              collapsible="offcanvas"
-              className={`border-l border-border bg-card text-foreground ${
-                isElectron ? "md:top-[52px] md:bottom-[40px] md:h-[calc(100svh-92px)]" : ""
-              }`}
-              resizable={{
-                minWidth: THREAD_SIDEBAR_MIN_WIDTH,
-                shouldAcceptWidth: ({ nextWidth, wrapper }) =>
-                  wrapper.clientWidth - nextWidth >=
-                  THREAD_MAIN_CONTENT_MIN_WIDTH +
-                    (shouldShowProjectExplorer ? PROJECT_EXPLORER_WIDTH : 0),
-                storageKey: THREAD_SIDEBAR_WIDTH_STORAGE_KEY,
-              }}
-            >
-              <ThreadSidebar />
-              <SidebarRail />
-            </Sidebar>
-          </div>
-          {isElectron ? (
-            <div className="fixed inset-x-0 bottom-0 z-20 flex h-[40px] items-center gap-4 border-t border-border bg-background px-4">
-              <div className="shrink-0 [-webkit-app-region:no-drag]">
-                <GlobalFooterWordmark />
-              </div>
-              <div className="flex min-w-0 flex-1 items-center [-webkit-app-region:no-drag]">
-                {footerContent ? (
-                  <div className="flex min-w-0 flex-1 items-center overflow-x-auto pl-2">
-                    {footerContent}
+                {isElectron ? (
+                  <div className="fixed inset-x-0 bottom-0 z-20 flex h-[40px] items-center gap-4 border-t border-border bg-background px-4">
+                    <div className="shrink-0 [-webkit-app-region:no-drag]">
+                      <GlobalFooterWordmark />
+                    </div>
+                    <div className="flex min-w-0 flex-1 items-center [-webkit-app-region:no-drag]">
+                      {!shouldShowProjectExplorer && footerContent ? (
+                        <div className="flex min-w-0 flex-1 items-center overflow-x-auto pl-2">
+                          {footerContent}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="shrink-0 [-webkit-app-region:no-drag]">
+                      <div className="flex items-center gap-1">
+                        {activeProject && !isSettingsRoute ? (
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className={cn(
+                                    "size-7 shrink-0",
+                                    terminalOpen ? "text-primary" : "text-muted-foreground",
+                                  )}
+                                  aria-label="Toggle terminal drawer"
+                                  onClick={() => {
+                                    window.dispatchEvent(new Event(TOGGLE_TERMINAL_DRAWER_EVENT));
+                                  }}
+                                >
+                                  <TerminalSquareIcon className="size-4" />
+                                </Button>
+                              }
+                            />
+                            <TooltipPopup side="top">Toggle terminal drawer</TooltipPopup>
+                          </Tooltip>
+                        ) : null}
+                        {shouldShowProjectExplorer && !isSettingsRoute ? (
+                          <ProjectExplorerTrigger />
+                        ) : null}
+                        {!isSettingsRoute ? <ChatSidebarHeaderTrigger /> : null}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 shrink-0 text-muted-foreground hover:bg-accent hover:text-foreground"
+                          aria-label={location.pathname === "/settings" ? "Back" : "Settings"}
+                          onClick={() => {
+                            if (location.pathname === "/settings") {
+                              window.history.back();
+                              return;
+                            }
+                            void navigate({ to: "/settings" });
+                          }}
+                        >
+                          {location.pathname === "/settings" ? (
+                            <ArrowLeftIcon className="size-3.5" />
+                          ) : (
+                            <SettingsIcon className="size-3.5" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 ) : null}
               </div>
-              <div className="shrink-0 [-webkit-app-region:no-drag]">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 gap-2 px-2 py-1.5 text-muted-foreground/70 hover:bg-accent hover:text-foreground"
-                  onClick={() => {
-                    if (location.pathname === "/settings") {
-                      window.history.back();
-                      return;
-                    }
-                    void navigate({ to: "/settings" });
-                  }}
-                >
-                  {location.pathname === "/settings" ? (
-                    <ArrowLeftIcon className="size-3.5" />
-                  ) : (
-                    <SettingsIcon className="size-3.5" />
-                  )}
-                  <span className="text-xs">
-                    {location.pathname === "/settings" ? "Back" : "Settings"}
-                  </span>
-                </Button>
-              </div>
-            </div>
-          ) : null}
-          </div>
-        </SidebarProvider>
-      </ProjectExplorerProvider>
+            </SidebarProvider>
+          </ProjectFileEditorProvider>
+        </ProjectExplorerProvider>
       </GlobalFooterContentContext.Provider>
     </GlobalHeaderContentContext.Provider>
   );

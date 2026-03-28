@@ -4,7 +4,10 @@ import type {
   OrchestrationProposedPlanId,
   OrchestrationSessionStatus,
   OrchestrationThreadActivity,
+  ProjectKnowledgeSource as ContractProjectKnowledgeSource,
+  ProjectMcpServer as ContractProjectMcpServer,
   ProjectScript as ContractProjectScript,
+  ProjectSkill as ContractProjectSkill,
   ThreadId,
   ProjectId,
   TurnId,
@@ -23,6 +26,9 @@ export const DEFAULT_THREAD_TERMINAL_HEIGHT = 280;
 export const DEFAULT_THREAD_TERMINAL_ID = "default";
 export const MAX_TERMINALS_PER_GROUP = 4;
 export type ProjectScript = ContractProjectScript;
+export type ProjectSkill = ContractProjectSkill;
+export type ProjectKnowledgeSource = ContractProjectKnowledgeSource;
+export type ProjectMcpServer = ContractProjectMcpServer;
 
 export interface ThreadTerminalGroup {
   id: string;
@@ -86,6 +92,9 @@ export interface Project {
   createdAt?: string | undefined;
   updatedAt?: string | undefined;
   scripts: ProjectScript[];
+  skills?: ProjectSkill[] | undefined;
+  knowledgeSources?: ProjectKnowledgeSource[] | undefined;
+  mcpServers?: ProjectMcpServer[] | undefined;
 }
 
 export interface Thread {

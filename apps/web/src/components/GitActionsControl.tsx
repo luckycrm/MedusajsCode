@@ -54,6 +54,8 @@ import { readNativeApi } from "~/nativeApi";
 interface GitActionsControlProps {
   gitCwd: string | null;
   activeThreadId: ThreadId | null;
+  mode?: "full" | "init-only";
+  forceExpanded?: boolean;
 }
 
 interface PendingDefaultBranchAction {
@@ -203,7 +205,12 @@ function GitQuickActionIcon({ quickAction }: { quickAction: GitQuickAction }) {
   return <InfoIcon className={iconClassName} />;
 }
 
-export default function GitActionsControl({ gitCwd, activeThreadId }: GitActionsControlProps) {
+export default function GitActionsControl({
+  gitCwd,
+  activeThreadId,
+  mode = "full",
+  forceExpanded = false,
+}: GitActionsControlProps) {
   const threadToastData = useMemo(
     () => (activeThreadId ? { threadId: activeThreadId } : undefined),
     [activeThreadId],
@@ -738,6 +745,11 @@ export default function GitActionsControl({ gitCwd, activeThreadId }: GitActions
 
   if (!gitCwd) return null;
 
+  const quickActionLabelClassName = forceExpanded
+    ? "ml-0.5"
+    : "sr-only @3xl/header-actions:not-sr-only @3xl/header-actions:ml-0.5";
+  const groupSeparatorClassName = forceExpanded ? "" : "hidden @3xl/header-actions:block";
+
   return (
     <>
       {!isRepo ? (
@@ -749,7 +761,7 @@ export default function GitActionsControl({ gitCwd, activeThreadId }: GitActions
         >
           {initMutation.isPending ? "Initializing..." : "Initialize Git"}
         </Button>
-      ) : (
+      ) : mode === "full" ? (
         <Group aria-label="Git actions" className="shrink-0">
           {quickActionDisabledReason ? (
             <Popover>
@@ -765,9 +777,7 @@ export default function GitActionsControl({ gitCwd, activeThreadId }: GitActions
                 }
               >
                 <GitQuickActionIcon quickAction={quickAction} />
-                <span className="sr-only @3xl/header-actions:not-sr-only @3xl/header-actions:ml-0.5">
-                  {quickAction.label}
-                </span>
+                <span className={quickActionLabelClassName}>{quickAction.label}</span>
               </PopoverTrigger>
               <PopoverPopup tooltipStyle side="bottom" align="start">
                 {quickActionDisabledReason}
@@ -781,12 +791,10 @@ export default function GitActionsControl({ gitCwd, activeThreadId }: GitActions
               onClick={runQuickAction}
             >
               <GitQuickActionIcon quickAction={quickAction} />
-              <span className="sr-only @3xl/header-actions:not-sr-only @3xl/header-actions:ml-0.5">
-                {quickAction.label}
-              </span>
+              <span className={quickActionLabelClassName}>{quickAction.label}</span>
             </Button>
           )}
-          <GroupSeparator className="hidden @3xl/header-actions:block" />
+          <GroupSeparator className={groupSeparatorClassName} />
           <Menu
             onOpenChange={(open) => {
               if (open) void invalidateGitQueries(queryClient);
@@ -864,7 +872,7 @@ export default function GitActionsControl({ gitCwd, activeThreadId }: GitActions
             </MenuPopup>
           </Menu>
         </Group>
-      )}
+      ) : null}
 
       <Dialog
         open={isCommitDialogOpen}

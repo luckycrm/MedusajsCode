@@ -23,12 +23,18 @@ import type {
   ProjectSearchEntriesInput,
   ProjectListDirectoryInput,
   ProjectListDirectoryResult,
+  ProjectReadFileInput,
+  ProjectReadFileResult,
   ProjectSearchEntriesResult,
   ProjectWriteFileInput,
   ProjectWriteFileResult,
 } from "./project";
 import type {
   ServerConfig,
+  ServerInspectMcpServerInput,
+  ServerInspectMcpServerResult,
+  ServerResolveKnowledgeSourcesInput,
+  ServerResolveKnowledgeSourcesResult,
   ServerProviderUpdatedPayload,
   ServerUpsertKeybindingResult,
 } from "./server";
@@ -136,10 +142,11 @@ export interface NativeApi {
   projects: {
     listDirectory: (input: ProjectListDirectoryInput) => Promise<ProjectListDirectoryResult>;
     searchEntries: (input: ProjectSearchEntriesInput) => Promise<ProjectSearchEntriesResult>;
+    readFile: (input: ProjectReadFileInput) => Promise<ProjectReadFileResult>;
     writeFile: (input: ProjectWriteFileInput) => Promise<ProjectWriteFileResult>;
   };
   shell: {
-    openInEditor: (cwd: string, editor: EditorId) => Promise<void>;
+    openInEditor: (cwd: string, editor: EditorId, workspaceRoot?: string) => Promise<void>;
     openExternal: (url: string) => Promise<void>;
   };
   git: {
@@ -172,6 +179,10 @@ export interface NativeApi {
     upsertKeybinding: (input: ServerUpsertKeybindingInput) => Promise<ServerUpsertKeybindingResult>;
     getSettings: () => Promise<ServerSettings>;
     updateSettings: (patch: ServerSettingsPatch) => Promise<ServerSettings>;
+    inspectMcpServer: (input: ServerInspectMcpServerInput) => Promise<ServerInspectMcpServerResult>;
+    resolveKnowledgeSources: (
+      input: ServerResolveKnowledgeSourcesInput,
+    ) => Promise<ServerResolveKnowledgeSourcesResult>;
   };
   orchestration: {
     getSnapshot: () => Promise<OrchestrationReadModel>;

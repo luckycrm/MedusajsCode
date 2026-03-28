@@ -170,7 +170,10 @@ export class NetService extends ServiceMap.Service<NetService, NetServiceShape>(
         Effect.zipWith(
           canListenOnHost(port, "127.0.0.1"),
           canListenOnHost(port, "::1"),
-          (ipv4, ipv6) => ipv4 && ipv6,
+          // Treat a port as usable when either loopback family is available.
+          // Requiring both can incorrectly reject healthy dev setups on
+          // machines where IPv6 loopback binding is disabled or restricted.
+          (ipv4, ipv6) => ipv4 || ipv6,
         ),
       reserveLoopbackPort,
       findAvailablePort: (preferred) =>

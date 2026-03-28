@@ -158,11 +158,16 @@ export function createWsNativeApi(): NativeApi {
     projects: {
       listDirectory: (input) => transport.request(WS_METHODS.projectsListDirectory, input),
       searchEntries: (input) => transport.request(WS_METHODS.projectsSearchEntries, input),
+      readFile: (input) => transport.request(WS_METHODS.projectsReadFile, input),
       writeFile: (input) => transport.request(WS_METHODS.projectsWriteFile, input),
     },
     shell: {
-      openInEditor: (cwd, editor) =>
-        transport.request(WS_METHODS.shellOpenInEditor, { cwd, editor }),
+      openInEditor: (cwd, editor, workspaceRoot) =>
+        transport.request(WS_METHODS.shellOpenInEditor, {
+          cwd,
+          editor,
+          ...(workspaceRoot ? { workspaceRoot } : {}),
+        }),
       openExternal: async (url) => {
         if (window.desktopBridge) {
           const opened = await window.desktopBridge.openExternal(url);
@@ -215,6 +220,9 @@ export function createWsNativeApi(): NativeApi {
       upsertKeybinding: (input) => transport.request(WS_METHODS.serverUpsertKeybinding, input),
       getSettings: () => transport.request(WS_METHODS.serverGetSettings),
       updateSettings: (patch) => transport.request(WS_METHODS.serverUpdateSettings, { patch }),
+      inspectMcpServer: (input) => transport.request(WS_METHODS.serverInspectMcpServer, input),
+      resolveKnowledgeSources: (input) =>
+        transport.request(WS_METHODS.serverResolveKnowledgeSources, input),
     },
     orchestration: {
       getSnapshot: () => transport.request(ORCHESTRATION_WS_METHODS.getSnapshot),

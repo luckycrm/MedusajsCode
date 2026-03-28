@@ -864,6 +864,8 @@ const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: {
   const displayText = preview ? `${heading} - ${preview}` : heading;
   const hasChangedFiles = (workEntry.changedFiles?.length ?? 0) > 0;
   const previewIsChangedFiles = hasChangedFiles && !workEntry.command && !workEntry.detail;
+  const showResultPreview =
+    typeof workEntry.resultPreview === "string" && workEntry.resultPreview.length > 0;
 
   return (
     <div className="rounded-lg px-1 py-1">
@@ -905,6 +907,13 @@ const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: {
               +{(workEntry.changedFiles?.length ?? 0) - 4}
             </span>
           )}
+        </div>
+      )}
+      {showResultPreview && (
+        <div className="mt-1 pl-6">
+          <p className="whitespace-pre-wrap break-words rounded-md border border-border/55 bg-background/75 px-2 py-1 text-[10px] leading-4 text-foreground/78">
+            {workEntry.resultPreview}
+          </p>
         </div>
       )}
     </div>

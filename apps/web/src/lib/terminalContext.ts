@@ -34,6 +34,8 @@ export interface ParsedTerminalContextEntry {
   body: string;
 }
 
+import { stripProjectAiContext } from "../projectAiPack";
+
 export const INLINE_TERMINAL_CONTEXT_PLACEHOLDER = "\uFFFC";
 
 const TRAILING_TERMINAL_CONTEXT_BLOCK_PATTERN =
@@ -235,10 +237,10 @@ export function extractTrailingTerminalContexts(prompt: string): ExtractedTermin
 }
 
 export function deriveDisplayedUserMessageState(prompt: string): DisplayedUserMessageState {
-  const extractedContexts = extractTrailingTerminalContexts(prompt);
+  const extractedContexts = extractTrailingTerminalContexts(stripProjectAiContext(prompt));
   return {
     visibleText: extractedContexts.promptText,
-    copyText: prompt,
+    copyText: extractedContexts.promptText,
     contextCount: extractedContexts.contextCount,
     previewTitle: extractedContexts.previewTitle,
     contexts: extractedContexts.contexts,

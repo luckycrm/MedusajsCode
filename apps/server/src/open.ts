@@ -25,11 +25,69 @@ export class OpenError extends Schema.TaggedErrorClass<OpenError>()("OpenError",
 export interface OpenInEditorInput {
   readonly cwd: string;
   readonly editor: EditorId;
+  readonly workspaceRoot?: string | undefined;
 }
 
 interface EditorLaunch {
   readonly command: string;
   readonly args: ReadonlyArray<string>;
+}
+
+function macApplicationNameForEditor(editorId: EditorId): string | null {
+  switch (editorId) {
+    case "cursor":
+      return "Cursor";
+    case "vscode":
+      return "Visual Studio Code";
+    case "vscode-insiders":
+      return "Visual Studio Code - Insiders";
+    case "vscodium":
+      return "VSCodium";
+    case "zed":
+      return "Zed";
+    case "antigravity":
+      return "Antigravity";
+    default:
+      return null;
+  }
+}
+
+function stripLineColumnSuffix(value: string): string {
+  return value.replace(LINE_COLUMN_SUFFIX_PATTERN, "");
+}
+
+function isWorkspaceScopedFileTarget(target: string, workspaceRoot: string): boolean {
+  const normalizedTarget = stripLineColumnSuffix(target);
+  if (normalizedTarget === workspaceRoot) {
+    return false;
+  }
+  return (
+    normalizedTarget.startsWith(`${workspaceRoot}/`) ||
+    normalizedTarget.startsWith(`${workspaceRoot}\\`)
+  );
+}
+
+function supportsProjectWindowRouting(editorId: EditorId): boolean {
+  return (
+    editorId === "cursor" ||
+    editorId === "vscode" ||
+    editorId === "vscode-insiders" ||
+    editorId === "vscodium"
+  );
+}
+
+function activationLaunchForEditor(
+  editorId: EditorId,
+  platform: NodeJS.Platform,
+): EditorLaunch | null {
+  if (platform !== "darwin") {
+    return null;
+  }
+  const appName = macApplicationNameForEditor(editorId);
+  if (!appName) {
+    return null;
+  }
+  return { command: "open", args: ["-a", appName] };
 }
 
 interface CommandAvailabilityOptions {
@@ -223,6 +281,60 @@ export const resolveEditorLaunch = Effect.fnUntraced(function* (
   return { command: fileManagerCommandForPlatform(platform), args: [input.cwd] };
 });
 
+export function resolveEditorLaunchSequence(
+  input: OpenInEditorInput,
+  openedProjectWindows: ReadonlyMap<EditorId, ReadonlySet<string>>,
+  platform: NodeJS.Platform = process.platform,
+): Effect.Effect<ReadonlyArray<EditorLaunch>, OpenError> {
+  return Effect.gen(function* () {
+    const editorDef = EDITORS.find((editor) => editor.id === input.editor);
+    if (!editorDef) {
+      return yield* new OpenError({ message: `Unknown editor: ${input.editor}` });
+    }
+
+    const activationLaunch = activationLaunchForEditor(input.editor, platform);
+    const workspaceRoot = input.workspaceRoot;
+    const canRouteToProjectWindow =
+      Boolean(editorDef.command) &&
+      workspaceRoot !== undefined &&
+      supportsProjectWindowRouting(input.editor) &&
+      isWorkspaceScopedFileTarget(input.cwd, workspaceRoot);
+
+    if (canRouteToProjectWindow && editorDef.command) {
+      const openedRoots = openedProjectWindows.get(input.editor);
+      const projectAlreadyOpened = openedRoots?.has(workspaceRoot!) ?? false;
+
+      if (!projectAlreadyOpened) {
+        return [
+          shouldUseGotoFlag(editorDef, input.cwd)
+            ? {
+                command: editorDef.command,
+                args: ["--new-window", workspaceRoot!, "--goto", input.cwd],
+              }
+            : {
+                command: editorDef.command,
+                args: ["--new-window", workspaceRoot!, input.cwd],
+              },
+          ...(activationLaunch ? [activationLaunch] : []),
+        ];
+      }
+
+      return [
+        shouldUseGotoFlag(editorDef, input.cwd)
+          ? {
+              command: editorDef.command,
+              args: ["--reuse-window", workspaceRoot!, "--goto", input.cwd],
+            }
+          : { command: editorDef.command, args: ["--reuse-window", workspaceRoot!, input.cwd] },
+        ...(activationLaunch ? [activationLaunch] : []),
+      ];
+    }
+
+    const singleLaunch = yield* resolveEditorLaunch(input, platform);
+    return [singleLaunch, ...(activationLaunch ? [activationLaunch] : [])];
+  });
+}
+
 export const launchDetached = (launch: EditorLaunch) =>
   Effect.gen(function* () {
     if (!isCommandAvailable(launch.command)) {
@@ -255,11 +367,22 @@ export const launchDetached = (launch: EditorLaunch) =>
     });
   });
 
+export const launchDetachedSequence = (launches: ReadonlyArray<EditorLaunch>) =>
+  Effect.gen(function* () {
+    for (const [index, launch] of launches.entries()) {
+      yield* launchDetached(launch);
+      if (index < launches.length - 1) {
+        yield* Effect.sleep("250 millis");
+      }
+    }
+  });
+
 const make = Effect.gen(function* () {
   const open = yield* Effect.tryPromise({
     try: () => import("open"),
     catch: (cause) => new OpenError({ message: "failed to load browser opener", cause }),
   });
+  const openedProjectWindows = new Map<EditorId, Set<string>>();
 
   return {
     openBrowser: (target) =>
@@ -267,7 +390,21 @@ const make = Effect.gen(function* () {
         try: () => open.default(target),
         catch: (cause) => new OpenError({ message: "Browser auto-open failed", cause }),
       }),
-    openInEditor: (input) => Effect.flatMap(resolveEditorLaunch(input), launchDetached),
+    openInEditor: (input) =>
+      Effect.gen(function* () {
+        const launches = yield* resolveEditorLaunchSequence(input, openedProjectWindows);
+        yield* launchDetachedSequence(launches);
+
+        if (
+          input.workspaceRoot &&
+          supportsProjectWindowRouting(input.editor) &&
+          isWorkspaceScopedFileTarget(input.cwd, input.workspaceRoot)
+        ) {
+          const editorRoots = openedProjectWindows.get(input.editor) ?? new Set<string>();
+          editorRoots.add(input.workspaceRoot);
+          openedProjectWindows.set(input.editor, editorRoots);
+        }
+      }),
   } satisfies OpenShape;
 });
 

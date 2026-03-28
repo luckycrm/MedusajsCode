@@ -12,6 +12,7 @@
 import {
   ModelSelection,
   NonNegativeInt,
+  ProjectMcpServer,
   ThreadId,
   ProviderInterruptTurnInput,
   ProviderRespondToRequestInput,
@@ -92,6 +93,7 @@ function toRuntimePayloadFromSession(
   session: ProviderSession,
   extra?: {
     readonly modelSelection?: unknown;
+    readonly mcpServers?: unknown;
     readonly lastRuntimeEvent?: string;
     readonly lastRuntimeEventAt?: string;
   },
@@ -102,6 +104,7 @@ function toRuntimePayloadFromSession(
     activeTurnId: session.activeTurnId ?? null,
     lastError: session.lastError ?? null,
     ...(extra?.modelSelection !== undefined ? { modelSelection: extra.modelSelection } : {}),
+    ...(extra?.mcpServers !== undefined ? { mcpServers: extra.mcpServers } : {}),
     ...(extra?.lastRuntimeEvent !== undefined ? { lastRuntimeEvent: extra.lastRuntimeEvent } : {}),
     ...(extra?.lastRuntimeEventAt !== undefined
       ? { lastRuntimeEventAt: extra.lastRuntimeEventAt }
@@ -117,6 +120,16 @@ function readPersistedModelSelection(
   }
   const raw = "modelSelection" in runtimePayload ? runtimePayload.modelSelection : undefined;
   return Schema.is(ModelSelection)(raw) ? raw : undefined;
+}
+
+function readPersistedMcpServers(
+  runtimePayload: ProviderRuntimeBinding["runtimePayload"],
+): ReadonlyArray<ProjectMcpServer> | undefined {
+  if (!runtimePayload || typeof runtimePayload !== "object" || Array.isArray(runtimePayload)) {
+    return undefined;
+  }
+  const raw = "mcpServers" in runtimePayload ? runtimePayload.mcpServers : undefined;
+  return Schema.is(Schema.Array(ProjectMcpServer))(raw) ? raw : undefined;
 }
 
 function readPersistedCwd(
@@ -162,6 +175,7 @@ const makeProviderService = (options?: ProviderServiceLiveOptions) =>
       threadId: ThreadId,
       extra?: {
         readonly modelSelection?: unknown;
+        readonly mcpServers?: unknown;
         readonly lastRuntimeEvent?: string;
         readonly lastRuntimeEventAt?: string;
       },
@@ -227,12 +241,14 @@ const makeProviderService = (options?: ProviderServiceLiveOptions) =>
 
         const persistedCwd = readPersistedCwd(input.binding.runtimePayload);
         const persistedModelSelection = readPersistedModelSelection(input.binding.runtimePayload);
+        const persistedMcpServers = readPersistedMcpServers(input.binding.runtimePayload);
 
         const resumed = yield* adapter.startSession({
           threadId: input.binding.threadId,
           provider: input.binding.provider,
           ...(persistedCwd ? { cwd: persistedCwd } : {}),
           ...(persistedModelSelection ? { modelSelection: persistedModelSelection } : {}),
+          ...(persistedMcpServers ? { mcpServers: persistedMcpServers } : {}),
           ...(hasResumeCursor ? { resumeCursor: input.binding.resumeCursor } : {}),
           runtimeMode: input.binding.runtimeMode ?? "full-access",
         });
@@ -330,6 +346,7 @@ const makeProviderService = (options?: ProviderServiceLiveOptions) =>
 
         yield* upsertSessionBinding(session, threadId, {
           modelSelection: input.modelSelection,
+          mcpServers: input.mcpServers,
         });
         yield* analytics.record("provider.session.started", {
           provider: session.provider,
@@ -339,6 +356,7 @@ const makeProviderService = (options?: ProviderServiceLiveOptions) =>
           hasModel:
             typeof input.modelSelection?.model === "string" &&
             input.modelSelection.model.trim().length > 0,
+          mcpServerCount: input.mcpServers?.length ?? 0,
         });
 
         return session;

@@ -6,7 +6,15 @@
  *
  * @module ProjectionProjectRepository
  */
-import { IsoDateTime, ModelSelection, ProjectId, ProjectScript } from "@mctools/contracts";
+import {
+  IsoDateTime,
+  ModelSelection,
+  ProjectId,
+  ProjectKnowledgeSource,
+  ProjectMcpServer,
+  ProjectScript,
+  ProjectSkill,
+} from "@mctools/contracts";
 import { Option, Schema, ServiceMap } from "effect";
 import type { Effect } from "effect";
 
@@ -18,6 +26,9 @@ export const ProjectionProject = Schema.Struct({
   workspaceRoot: Schema.String,
   defaultModelSelection: Schema.NullOr(ModelSelection),
   scripts: Schema.Array(ProjectScript),
+  skills: Schema.Array(ProjectSkill),
+  knowledgeSources: Schema.Array(ProjectKnowledgeSource),
+  mcpServers: Schema.Array(ProjectMcpServer),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
   deletedAt: Schema.NullOr(IsoDateTime),

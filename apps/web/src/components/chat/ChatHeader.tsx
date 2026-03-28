@@ -15,11 +15,13 @@ import { Toggle } from "../ui/toggle";
 import { SidebarTrigger } from "../ui/sidebar";
 import { ProjectExplorerTrigger } from "../ProjectExplorerSidebar";
 import { OpenInPicker } from "./OpenInPicker";
+import type { Project } from "../../types";
 
 interface ChatHeaderProps {
   className?: string;
   activeThreadId: ThreadId;
   activeProjectName: string | undefined;
+  activeProject?: Project | undefined;
   isGitRepo: boolean;
   openInCwd: string | null;
   activeProjectScripts: ProjectScript[] | undefined;
@@ -32,6 +34,7 @@ interface ChatHeaderProps {
   terminalAvailable: boolean;
   terminalOpen: boolean;
   showTerminalToggle?: boolean;
+  expandUtilityLabels?: boolean;
   terminalToggleShortcutLabel: string | null;
   diffToggleShortcutLabel: string | null;
   gitCwd: string | null;
@@ -60,6 +63,7 @@ export const ChatHeader = memo(function ChatHeader({
   terminalAvailable,
   terminalOpen,
   showTerminalToggle = true,
+  expandUtilityLabels = false,
   terminalToggleShortcutLabel,
   diffToggleShortcutLabel,
   gitCwd,
@@ -112,7 +116,7 @@ export const ChatHeader = memo(function ChatHeader({
             <TooltipTrigger
               render={
                 <Toggle
-                  className="shrink-0"
+                  className="shrink-0 gap-1.5"
                   pressed={terminalOpen}
                   onPressedChange={onToggleTerminal}
                   aria-label="Toggle terminal drawer"
@@ -121,6 +125,7 @@ export const ChatHeader = memo(function ChatHeader({
                   disabled={!terminalAvailable}
                 >
                   <TerminalSquareIcon className="size-3" />
+                  {expandUtilityLabels ? <span>Terminal</span> : null}
                 </Toggle>
               }
             />
@@ -137,7 +142,7 @@ export const ChatHeader = memo(function ChatHeader({
           <TooltipTrigger
             render={
               <Toggle
-                className="shrink-0"
+                className="shrink-0 gap-1.5"
                 pressed={diffOpen}
                 onPressedChange={onToggleDiff}
                 aria-label="Toggle diff panel"
@@ -146,6 +151,7 @@ export const ChatHeader = memo(function ChatHeader({
                 disabled={!isGitRepo}
               >
                 <DiffIcon className="size-3" />
+                {expandUtilityLabels ? <span>View Diff</span> : null}
               </Toggle>
             }
           />

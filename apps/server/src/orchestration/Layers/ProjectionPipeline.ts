@@ -364,6 +364,9 @@ const makeOrchestrationProjectionPipeline = Effect.gen(function* () {
             workspaceRoot: event.payload.workspaceRoot,
             defaultModelSelection: event.payload.defaultModelSelection,
             scripts: event.payload.scripts,
+            skills: event.payload.skills,
+            knowledgeSources: event.payload.knowledgeSources,
+            mcpServers: event.payload.mcpServers,
             createdAt: event.payload.createdAt,
             updatedAt: event.payload.updatedAt,
             deletedAt: null,
@@ -387,6 +390,13 @@ const makeOrchestrationProjectionPipeline = Effect.gen(function* () {
               ? { defaultModelSelection: event.payload.defaultModelSelection }
               : {}),
             ...(event.payload.scripts !== undefined ? { scripts: event.payload.scripts } : {}),
+            ...(event.payload.skills !== undefined ? { skills: event.payload.skills } : {}),
+            ...(event.payload.knowledgeSources !== undefined
+              ? { knowledgeSources: event.payload.knowledgeSources }
+              : {}),
+            ...(event.payload.mcpServers !== undefined
+              ? { mcpServers: event.payload.mcpServers }
+              : {}),
             updatedAt: event.payload.updatedAt,
           });
           return;

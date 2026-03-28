@@ -8,6 +8,7 @@ import {
   launchDetached,
   resolveAvailableEditors,
   resolveEditorLaunch,
+  resolveEditorLaunchSequence,
 } from "./open";
 
 it.layer(NodeServices.layer)("resolveEditorLaunch", (it) => {
@@ -155,6 +156,52 @@ it.layer(NodeServices.layer)("resolveEditorLaunch", (it) => {
         command: "xdg-open",
         args: ["/tmp/workspace"],
       });
+    }),
+  );
+});
+
+it.layer(NodeServices.layer)("resolveEditorLaunchSequence", (it) => {
+  it.effect("opens a project in a new window before opening a file on first explorer click", () =>
+    Effect.gen(function* () {
+      const launches = yield* resolveEditorLaunchSequence(
+        {
+          cwd: "/tmp/workspace/src/open.ts:71:5",
+          editor: "cursor",
+          workspaceRoot: "/tmp/workspace",
+        },
+        new Map(),
+        "darwin",
+      );
+
+      assert.deepEqual(launches, [
+        {
+          command: "cursor",
+          args: ["--new-window", "/tmp/workspace", "--goto", "/tmp/workspace/src/open.ts:71:5"],
+        },
+        { command: "open", args: ["-a", "Cursor"] },
+      ]);
+    }),
+  );
+
+  it.effect("reuses the existing project window for subsequent file opens", () =>
+    Effect.gen(function* () {
+      const launches = yield* resolveEditorLaunchSequence(
+        {
+          cwd: "/tmp/workspace/src/open.ts:71:5",
+          editor: "vscode",
+          workspaceRoot: "/tmp/workspace",
+        },
+        new Map([["vscode", new Set(["/tmp/workspace"])]]),
+        "darwin",
+      );
+
+      assert.deepEqual(launches, [
+        {
+          command: "code",
+          args: ["--reuse-window", "/tmp/workspace", "--goto", "/tmp/workspace/src/open.ts:71:5"],
+        },
+        { command: "open", args: ["-a", "Visual Studio Code"] },
+      ]);
     }),
   );
 });

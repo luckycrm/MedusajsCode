@@ -821,12 +821,12 @@ it.layer(TestLayer)("git integration", (it) => {
 
         expect(renamed.branch).toBe("medusajscode/feat/session-1");
         const branches = yield* (yield* GitCore).listBranches({ cwd: tmp });
-        expect(branches.branches.some((branch) => branch.name === "medusajscode/feat/session")).toBe(
-          true,
-        );
-        expect(branches.branches.some((branch) => branch.name === "medusajscode/feat/session-1")).toBe(
-          true,
-        );
+        expect(
+          branches.branches.some((branch) => branch.name === "medusajscode/feat/session"),
+        ).toBe(true);
+        expect(
+          branches.branches.some((branch) => branch.name === "medusajscode/feat/session-1"),
+        ).toBe(true);
         const current = branches.branches.find((branch) => branch.current);
         expect(current?.name).toBe("medusajscode/feat/session-1");
       }),
@@ -1548,7 +1548,12 @@ it.layer(TestLayer)("git integration", (it) => {
             yield* git(tmp, ["ls-remote", "--heads", "jasonLaster", "statemachine"]),
           ).toContain("statemachine");
           expect(
-            yield* git(tmp, ["ls-remote", "--heads", "jasonLaster", "medusajscode/pr-488/statemachine"]),
+            yield* git(tmp, [
+              "ls-remote",
+              "--heads",
+              "jasonLaster",
+              "medusajscode/pr-488/statemachine",
+            ]),
           ).toBe("");
         }),
     );

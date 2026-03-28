@@ -3,6 +3,11 @@ import type {
   OrchestrationEvent,
   OrchestrationReadModel,
 } from "@mctools/contracts";
+import {
+  MEDUSA_PROJECT_KNOWLEDGE_SOURCES,
+  MEDUSA_PROJECT_MCP_SERVERS,
+  MEDUSA_PROJECT_SKILLS,
+} from "@mctools/shared/projectAi";
 import { Effect } from "effect";
 
 import { OrchestrationCommandInvariantError } from "./Errors.ts";
@@ -78,6 +83,9 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           workspaceRoot: command.workspaceRoot,
           defaultModelSelection: command.defaultModelSelection ?? null,
           scripts: [],
+          skills: MEDUSA_PROJECT_SKILLS,
+          knowledgeSources: MEDUSA_PROJECT_KNOWLEDGE_SOURCES,
+          mcpServers: MEDUSA_PROJECT_MCP_SERVERS,
           createdAt: command.createdAt,
           updatedAt: command.createdAt,
         },
@@ -107,6 +115,11 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
             ? { defaultModelSelection: command.defaultModelSelection }
             : {}),
           ...(command.scripts !== undefined ? { scripts: command.scripts } : {}),
+          ...(command.skills !== undefined ? { skills: command.skills } : {}),
+          ...(command.knowledgeSources !== undefined
+            ? { knowledgeSources: command.knowledgeSources }
+            : {}),
+          ...(command.mcpServers !== undefined ? { mcpServers: command.mcpServers } : {}),
           updatedAt: occurredAt,
         },
       };

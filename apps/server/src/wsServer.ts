@@ -50,7 +50,13 @@ import { GitManager } from "./git/Services/GitManager.ts";
 import { TerminalManager } from "./terminal/Services/Manager.ts";
 import { Keybindings } from "./keybindings";
 import { ServerSettingsService } from "./serverSettings";
-import { listWorkspaceDirectory, searchWorkspaceEntries } from "./workspaceEntries";
+import {
+  listWorkspaceDirectory,
+  readWorkspaceFile,
+  searchWorkspaceEntries,
+} from "./workspaceEntries";
+import { inspectMcpServer } from "./mcp/inspectMcpServer";
+import { resolveKnowledgeSources } from "./knowledge/resolveKnowledgeSources";
 import { OrchestrationEngineService } from "./orchestration/Services/OrchestrationEngine";
 import { ProjectionSnapshotQuery } from "./orchestration/Services/ProjectionSnapshotQuery";
 import { OrchestrationReactor } from "./orchestration/Services/OrchestrationReactor";
@@ -788,6 +794,17 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
         });
       }
 
+      case WS_METHODS.projectsReadFile: {
+        const body = stripRequestTag(request.body);
+        return yield* Effect.tryPromise({
+          try: () => readWorkspaceFile(body),
+          catch: (cause) =>
+            new RouteRequestError({
+              message: `Failed to read workspace file: ${String(cause)}`,
+            }),
+        });
+      }
+
       case WS_METHODS.projectsWriteFile: {
         const body = stripRequestTag(request.body);
         const target = yield* resolveWorkspaceWritePath({
@@ -946,6 +963,28 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
       case WS_METHODS.serverUpdateSettings: {
         const body = stripRequestTag(request.body);
         return yield* serverSettingsManager.updateSettings(body.patch);
+      }
+
+      case WS_METHODS.serverInspectMcpServer: {
+        const body = stripRequestTag(request.body);
+        return yield* Effect.tryPromise({
+          try: () => inspectMcpServer(body),
+          catch: (cause) =>
+            new RouteRequestError({
+              message: `Failed to inspect MCP server: ${String(cause)}`,
+            }),
+        });
+      }
+
+      case WS_METHODS.serverResolveKnowledgeSources: {
+        const body = stripRequestTag(request.body);
+        return yield* Effect.tryPromise({
+          try: () => resolveKnowledgeSources(body.sources),
+          catch: (cause) =>
+            new RouteRequestError({
+              message: `Failed to resolve knowledge sources: ${String(cause)}`,
+            }),
+        });
       }
 
       default: {

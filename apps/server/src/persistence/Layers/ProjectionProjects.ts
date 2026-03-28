@@ -2,7 +2,13 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqlSchema from "effect/unstable/sql/SqlSchema";
 import { Effect, Layer, Schema, Struct } from "effect";
 
-import { ModelSelection, ProjectScript } from "@mctools/contracts";
+import {
+  ModelSelection,
+  ProjectKnowledgeSource,
+  ProjectMcpServer,
+  ProjectScript,
+  ProjectSkill,
+} from "@mctools/contracts";
 import { toPersistenceSqlError } from "../Errors.ts";
 import {
   DeleteProjectionProjectInput,
@@ -16,6 +22,9 @@ const ProjectionProjectDbRow = ProjectionProject.mapFields(
   Struct.assign({
     defaultModelSelection: Schema.NullOr(Schema.fromJsonString(ModelSelection)),
     scripts: Schema.fromJsonString(Schema.Array(ProjectScript)),
+    skills: Schema.fromJsonString(Schema.Array(ProjectSkill)),
+    knowledgeSources: Schema.fromJsonString(Schema.Array(ProjectKnowledgeSource)),
+    mcpServers: Schema.fromJsonString(Schema.Array(ProjectMcpServer)),
   }),
 );
 type ProjectionProjectDbRow = typeof ProjectionProjectDbRow.Type;
@@ -33,6 +42,9 @@ const makeProjectionProjectRepository = Effect.gen(function* () {
           workspace_root,
           default_model_selection_json,
           scripts_json,
+          skills_json,
+          knowledge_sources_json,
+          mcp_servers_json,
           created_at,
           updated_at,
           deleted_at
@@ -43,6 +55,9 @@ const makeProjectionProjectRepository = Effect.gen(function* () {
           ${row.workspaceRoot},
           ${row.defaultModelSelection !== null ? JSON.stringify(row.defaultModelSelection) : null},
           ${JSON.stringify(row.scripts)},
+          ${JSON.stringify(row.skills)},
+          ${JSON.stringify(row.knowledgeSources)},
+          ${JSON.stringify(row.mcpServers)},
           ${row.createdAt},
           ${row.updatedAt},
           ${row.deletedAt}
@@ -53,6 +68,9 @@ const makeProjectionProjectRepository = Effect.gen(function* () {
           workspace_root = excluded.workspace_root,
           default_model_selection_json = excluded.default_model_selection_json,
           scripts_json = excluded.scripts_json,
+          skills_json = excluded.skills_json,
+          knowledge_sources_json = excluded.knowledge_sources_json,
+          mcp_servers_json = excluded.mcp_servers_json,
           created_at = excluded.created_at,
           updated_at = excluded.updated_at,
           deleted_at = excluded.deleted_at
@@ -70,6 +88,9 @@ const makeProjectionProjectRepository = Effect.gen(function* () {
           workspace_root AS "workspaceRoot",
           default_model_selection_json AS "defaultModelSelection",
           scripts_json AS "scripts",
+          skills_json AS "skills",
+          knowledge_sources_json AS "knowledgeSources",
+          mcp_servers_json AS "mcpServers",
           created_at AS "createdAt",
           updated_at AS "updatedAt",
           deleted_at AS "deletedAt"
@@ -89,6 +110,9 @@ const makeProjectionProjectRepository = Effect.gen(function* () {
           workspace_root AS "workspaceRoot",
           default_model_selection_json AS "defaultModelSelection",
           scripts_json AS "scripts",
+          skills_json AS "skills",
+          knowledge_sources_json AS "knowledgeSources",
+          mcp_servers_json AS "mcpServers",
           created_at AS "createdAt",
           updated_at AS "updatedAt",
           deleted_at AS "deletedAt"

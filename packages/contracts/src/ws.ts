@@ -35,9 +35,19 @@ import {
   TerminalWriteInput,
 } from "./terminal";
 import { KeybindingRule } from "./keybindings";
-import { ProjectListDirectoryInput, ProjectSearchEntriesInput, ProjectWriteFileInput } from "./project";
+import {
+  ProjectListDirectoryInput,
+  ProjectReadFileInput,
+  ProjectSearchEntriesInput,
+  ProjectWriteFileInput,
+} from "./project";
 import { OpenInEditorInput } from "./editor";
-import { ServerConfigUpdatedPayload, ServerProviderUpdatedPayload } from "./server";
+import {
+  ServerConfigUpdatedPayload,
+  ServerInspectMcpServerInput,
+  ServerResolveKnowledgeSourcesInput,
+  ServerProviderUpdatedPayload,
+} from "./server";
 import { ServerSettingsPatch } from "./settings";
 
 // ── WebSocket RPC Method Names ───────────────────────────────────────
@@ -49,6 +59,7 @@ export const WS_METHODS = {
   projectsRemove: "projects.remove",
   projectsListDirectory: "projects.listDirectory",
   projectsSearchEntries: "projects.searchEntries",
+  projectsReadFile: "projects.readFile",
   projectsWriteFile: "projects.writeFile",
 
   // Shell methods
@@ -81,6 +92,8 @@ export const WS_METHODS = {
   serverUpsertKeybinding: "server.upsertKeybinding",
   serverGetSettings: "server.getSettings",
   serverUpdateSettings: "server.updateSettings",
+  serverInspectMcpServer: "server.inspectMcpServer",
+  serverResolveKnowledgeSources: "server.resolveKnowledgeSources",
 } as const;
 
 // ── Push Event Channels ──────────────────────────────────────────────
@@ -119,6 +132,7 @@ const WebSocketRequestBody = Schema.Union([
   // Project Search
   tagRequestBody(WS_METHODS.projectsListDirectory, ProjectListDirectoryInput),
   tagRequestBody(WS_METHODS.projectsSearchEntries, ProjectSearchEntriesInput),
+  tagRequestBody(WS_METHODS.projectsReadFile, ProjectReadFileInput),
   tagRequestBody(WS_METHODS.projectsWriteFile, ProjectWriteFileInput),
 
   // Shell methods
@@ -151,6 +165,8 @@ const WebSocketRequestBody = Schema.Union([
   tagRequestBody(WS_METHODS.serverUpsertKeybinding, KeybindingRule),
   tagRequestBody(WS_METHODS.serverGetSettings, Schema.Struct({})),
   tagRequestBody(WS_METHODS.serverUpdateSettings, Schema.Struct({ patch: ServerSettingsPatch })),
+  tagRequestBody(WS_METHODS.serverInspectMcpServer, ServerInspectMcpServerInput),
+  tagRequestBody(WS_METHODS.serverResolveKnowledgeSources, ServerResolveKnowledgeSourcesInput),
 ]);
 
 export const WebSocketRequest = Schema.Struct({

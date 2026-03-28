@@ -30,6 +30,7 @@
 > You need to have [Codex CLI](https://github.com/openai/codex) installed and authorized for MedusaJS Code to work.
 
 If you don't use the compiled desktop version, you can run it via the CLI:
+
 ```bash
 npx medusajscode
 ```
@@ -38,7 +39,7 @@ However, we recommend running the highly-optimized **Desktop App**.
 
 📥 **[Download MedusaJS Code Desktop](https://medusajscode.pages.dev/)**
 
-*(Or grab the raw binaries from our [GitHub Releases page](https://github.com/luckycrm/medusajscode/releases))*
+_(Or grab the raw binaries from our [GitHub Releases page](https://github.com/luckycrm/medusajscode/releases))_
 
 ## Current Status
 

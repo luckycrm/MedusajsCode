@@ -7,6 +7,8 @@ import {
   ProjectListDirectoryInput,
   ProjectListDirectoryResult,
   ProjectEntry,
+  ProjectReadFileInput,
+  ProjectReadFileResult,
   ProjectSearchEntriesInput,
   ProjectSearchEntriesResult,
 } from "@mctools/contracts";
@@ -618,4 +620,27 @@ export async function listWorkspaceDirectory(
     });
 
   return { entries };
+}
+
+export async function readWorkspaceFile(
+  input: ProjectReadFileInput,
+): Promise<ProjectReadFileResult> {
+  const workspaceRoot = path.resolve(input.cwd);
+  const relativePath = input.relativePath.trim();
+  const absoluteFilePath = path.resolve(workspaceRoot, relativePath);
+
+  if (!isInsideWorkspaceRoot(workspaceRoot, absoluteFilePath)) {
+    throw new Error("Workspace file path must stay within the project root.");
+  }
+
+  const stats = await fs.stat(absoluteFilePath);
+  if (!stats.isFile()) {
+    throw new Error(`Path is not a file: ${absoluteFilePath}`);
+  }
+
+  const contents = await fs.readFile(absoluteFilePath, "utf8");
+  return {
+    relativePath: toPosixPath(relativePath),
+    contents,
+  };
 }

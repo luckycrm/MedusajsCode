@@ -886,10 +886,7 @@ export const makeGitManager = Effect.gen(function* () {
         modelSelection,
       });
 
-      const bodyFile = path.join(
-        tempDir,
-        `medusajscode-pr-body-${process.pid}-${randomUUID()}.md`,
-      );
+      const bodyFile = path.join(tempDir, `medusajscode-pr-body-${process.pid}-${randomUUID()}.md`);
       yield* fileSystem
         .writeFileString(bodyFile, generated.body)
         .pipe(

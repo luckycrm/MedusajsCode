@@ -35,6 +35,10 @@
     "./Struct": {
       "types": "./src/Struct.ts",
       "import": "./src/Struct.ts"
+    },
+    "./projectAi": {
+      "types": "./src/projectAi.ts",
+      "import": "./src/projectAi.ts"
     }
   },
   "scripts": {

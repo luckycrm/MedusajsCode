@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  BookCopyIcon,
+  BrainCircuitIcon,
   ChevronDownIcon,
+  DatabaseZapIcon,
   InfoIcon,
   LoaderIcon,
   PlusIcon,
@@ -10,12 +13,14 @@ import {
   Undo2Icon,
   XIcon,
 } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  type ProjectId,
   PROVIDER_DISPLAY_NAMES,
   type ProviderKind,
   type ServerProvider,
   type ServerProviderModel,
+  type ServerInspectMcpServerResult,
 } from "@mctools/contracts";
 import { normalizeModelSlug } from "@mctools/shared/model";
 import { useSettings, useUpdateSettings } from "../hooks/useSettings";
@@ -35,19 +40,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { SidebarTrigger } from "../components/ui/sidebar";
 import { Switch } from "../components/ui/switch";
 import { ProviderModelPicker } from "../components/chat/ProviderModelPicker";
 import { TraitsPicker } from "../components/chat/TraitsPicker";
-import { SidebarInset } from "../components/ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../components/ui/tooltip";
 import { resolveAndPersistPreferredEditor } from "../editorPreferences";
 import { isElectron } from "../env";
 import { useTheme } from "../hooks/useTheme";
 import { serverConfigQueryOptions, serverQueryKeys } from "../lib/serverReactQuery";
-import { cn } from "../lib/utils";
+import { cn, newCommandId } from "../lib/utils";
 import { formatRelativeTime } from "../timestampFormat";
 import { ensureNativeApi, readNativeApi } from "../nativeApi";
+import { useStore } from "../store";
+import type { Project, ProjectKnowledgeSource, ProjectMcpServer, ProjectSkill } from "../types";
+import {
+  MEDUSA_PROJECT_KNOWLEDGE_SOURCES,
+  MEDUSA_PROJECT_MCP_SERVERS,
+  MEDUSA_PROJECT_SKILLS,
+} from "@mctools/shared/projectAi";
 import { DEFAULT_UNIFIED_SETTINGS } from "@mctools/contracts/settings";
 import { Equal } from "effect";
 
@@ -139,7 +149,7 @@ function getProviderSummary(provider: ServerProvider | undefined): {
       headline: "Disabled",
       detail:
         provider.message ??
-          "This provider is installed but disabled for new sessions in MedusaJS Code.",
+        "This provider is installed but disabled for new sessions in MedusaJS Code.",
     };
   }
   if (!provider.installed) {
@@ -313,9 +323,16 @@ function SettingsRouteView() {
     Partial<Record<ProviderKind, string | null>>
   >({});
   const [isRefreshingProviders, setIsRefreshingProviders] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<Project["id"] | null>(null);
+  const [isSavingProjectAi, setIsSavingProjectAi] = useState(false);
+  const [inspectingMcpId, setInspectingMcpId] = useState<string | null>(null);
+  const [inspectionResults, setInspectionResults] = useState<
+    Record<string, { data: ServerInspectMcpServerResult | null; error: string | null }>
+  >({});
   const refreshingRef = useRef(false);
   const queryClient = useQueryClient();
   useRelativeTimeTick();
+  const projects = useStore((store) => store.projects);
 
   const refreshProviders = useCallback(() => {
     if (refreshingRef.current) return;
@@ -538,6 +555,192 @@ function SettingsRouteView() {
     };
   });
 
+  useEffect(() => {
+    if (selectedProjectId && projects.some((project) => project.id === selectedProjectId)) {
+      return;
+    }
+    setSelectedProjectId(projects[0]?.id ?? null);
+  }, [projects, selectedProjectId]);
+
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.id === selectedProjectId) ?? null,
+    [projects, selectedProjectId],
+  );
+  const selectedProjectSkills = useMemo(() => selectedProject?.skills ?? [], [selectedProject]);
+  const selectedProjectKnowledgeSources = useMemo(
+    () => selectedProject?.knowledgeSources ?? [],
+    [selectedProject],
+  );
+  const selectedProjectMcpServers = useMemo(
+    () => selectedProject?.mcpServers ?? [],
+    [selectedProject],
+  );
+
+  const persistProjectAiContext = useCallback(
+    async (input: {
+      projectId: ProjectId;
+      skills: ProjectSkill[];
+      knowledgeSources: ProjectKnowledgeSource[];
+      mcpServers: ProjectMcpServer[];
+    }) => {
+      const api = readNativeApi();
+      if (!api) return;
+
+      await api.orchestration.dispatchCommand({
+        type: "project.meta.update",
+        commandId: newCommandId(),
+        projectId: input.projectId,
+        skills: input.skills,
+        knowledgeSources: input.knowledgeSources,
+        mcpServers: input.mcpServers,
+      });
+    },
+    [],
+  );
+
+  const saveSelectedProjectAiContext = useCallback(
+    async (input: {
+      skills: ProjectSkill[];
+      knowledgeSources: ProjectKnowledgeSource[];
+      mcpServers: ProjectMcpServer[];
+    }) => {
+      if (!selectedProject) return;
+      setIsSavingProjectAi(true);
+      try {
+        await persistProjectAiContext({
+          projectId: selectedProject.id,
+          skills: input.skills,
+          knowledgeSources: input.knowledgeSources,
+          mcpServers: input.mcpServers,
+        });
+      } finally {
+        setIsSavingProjectAi(false);
+      }
+    },
+    [persistProjectAiContext, selectedProject],
+  );
+
+  const toggleProjectSkill = useCallback(
+    async (skillId: string, checked: boolean) => {
+      if (!selectedProject) return;
+      await saveSelectedProjectAiContext({
+        skills: checked
+          ? MEDUSA_PROJECT_SKILLS.filter(
+              (entry) =>
+                entry.id === skillId ||
+                selectedProjectSkills.some((skill) => skill.id === entry.id),
+            )
+          : selectedProjectSkills.filter((skill) => skill.id !== skillId),
+        knowledgeSources: selectedProjectKnowledgeSources,
+        mcpServers: selectedProjectMcpServers,
+      });
+    },
+    [
+      saveSelectedProjectAiContext,
+      selectedProject,
+      selectedProjectKnowledgeSources,
+      selectedProjectMcpServers,
+      selectedProjectSkills,
+    ],
+  );
+
+  const toggleProjectKnowledge = useCallback(
+    async (sourceId: string, checked: boolean) => {
+      if (!selectedProject) return;
+      await saveSelectedProjectAiContext({
+        skills: selectedProjectSkills,
+        knowledgeSources: checked
+          ? MEDUSA_PROJECT_KNOWLEDGE_SOURCES.filter(
+              (entry) =>
+                entry.id === sourceId ||
+                selectedProjectKnowledgeSources.some((source) => source.id === entry.id),
+            )
+          : selectedProjectKnowledgeSources.filter((source) => source.id !== sourceId),
+        mcpServers: selectedProjectMcpServers,
+      });
+    },
+    [
+      saveSelectedProjectAiContext,
+      selectedProject,
+      selectedProjectKnowledgeSources,
+      selectedProjectMcpServers,
+      selectedProjectSkills,
+    ],
+  );
+
+  const toggleProjectMcp = useCallback(
+    async (serverId: string, checked: boolean) => {
+      if (!selectedProject) return;
+      await saveSelectedProjectAiContext({
+        skills: selectedProjectSkills,
+        knowledgeSources: selectedProjectKnowledgeSources,
+        mcpServers: checked
+          ? MEDUSA_PROJECT_MCP_SERVERS.filter(
+              (entry) =>
+                entry.id === serverId ||
+                selectedProjectMcpServers.some((server) => server.id === entry.id),
+            )
+          : selectedProjectMcpServers.filter((server) => server.id !== serverId),
+      });
+    },
+    [
+      saveSelectedProjectAiContext,
+      selectedProject,
+      selectedProjectKnowledgeSources,
+      selectedProjectMcpServers,
+      selectedProjectSkills,
+    ],
+  );
+
+  const enableAllProjectAi = useCallback(async () => {
+    await saveSelectedProjectAiContext({
+      skills: MEDUSA_PROJECT_SKILLS,
+      knowledgeSources: MEDUSA_PROJECT_KNOWLEDGE_SOURCES,
+      mcpServers: MEDUSA_PROJECT_MCP_SERVERS,
+    });
+  }, [saveSelectedProjectAiContext]);
+
+  const disableAllProjectAi = useCallback(async () => {
+    await saveSelectedProjectAiContext({
+      skills: [],
+      knowledgeSources: [],
+      mcpServers: [],
+    });
+  }, [saveSelectedProjectAiContext]);
+
+  const inspectMcpServer = useCallback(async (entry: ProjectMcpServer) => {
+    const api = readNativeApi();
+    if (!api) {
+      setInspectionResults((current) => ({
+        ...current,
+        [entry.id]: { data: current[entry.id]?.data ?? null, error: "Native API unavailable." },
+      }));
+      return;
+    }
+
+    setInspectingMcpId(entry.id);
+    try {
+      const data = await api.server.inspectMcpServer({
+        transport: entry.transport,
+        url: entry.url,
+      });
+      setInspectionResults((current) => ({
+        ...current,
+        [entry.id]: { data, error: null },
+      }));
+    } catch (error) {
+      setInspectionResults((current) => ({
+        ...current,
+        [entry.id]: {
+          data: current[entry.id]?.data ?? null,
+          error: error instanceof Error ? error.message : "Unable to inspect MCP server.",
+        },
+      }));
+    } finally {
+      setInspectingMcpId((current) => (current === entry.id ? null : current));
+    }
+  }, []);
+
   async function restoreDefaults() {
     if (changedSettingLabels.length === 0) return;
 
@@ -563,12 +766,16 @@ function SettingsRouteView() {
   }
 
   return (
-    <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none bg-background text-foreground isolate">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background text-foreground">
+    <div
+      className={cn(
+        "flex min-h-0 min-w-0 flex-1 overflow-hidden overscroll-y-none bg-background text-foreground isolate",
+        isElectron ? "h-[calc(100svh-92px)]" : "h-svh",
+      )}
+    >
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-background text-foreground">
         {!isElectron && (
           <header className="border-b border-border px-3 py-2 sm:px-5">
             <div className="flex items-center gap-2">
-              <SidebarTrigger className="size-7 shrink-0 md:hidden" />
               <span className="text-sm font-medium text-foreground">Settings</span>
               <div className="ms-auto flex items-center gap-2">
                 <Button
@@ -604,7 +811,7 @@ function SettingsRouteView() {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="h-full min-h-0 flex-1 overflow-y-auto p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
           <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
             <SettingsSection title="General">
               <SettingsRow
@@ -883,6 +1090,237 @@ function SettingsRouteView() {
                   </div>
                 }
               />
+            </SettingsSection>
+
+            <SettingsSection
+              title="Project AI"
+              headerAction={
+                projects.length > 0 ? (
+                  <Select
+                    value={selectedProject?.id ?? ""}
+                    onValueChange={(value) => {
+                      const nextProject = projects.find((project) => project.id === value);
+                      setSelectedProjectId(nextProject?.id ?? null);
+                    }}
+                  >
+                    <SelectTrigger
+                      className="w-full sm:w-56"
+                      aria-label="Project AI target project"
+                    >
+                      <SelectValue>{selectedProject?.name ?? "Select project"}</SelectValue>
+                    </SelectTrigger>
+                    <SelectPopup align="end" alignItemWithTrigger={false}>
+                      {projects.map((project) => (
+                        <SelectItem hideIndicator key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectPopup>
+                  </Select>
+                ) : null
+              }
+            >
+              {!selectedProject ? (
+                <div className="px-4 py-4 text-sm text-muted-foreground sm:px-5">
+                  Open a project first to configure Medusa AI skills, knowledge sources, and MCP.
+                </div>
+              ) : (
+                <>
+                  <SettingsRow
+                    title="Medusa AI pack"
+                    description="Manage Medusa-specific skills, docs references, and MCP integrations for the selected project."
+                    status={
+                      isSavingProjectAi
+                        ? "Saving project AI settings..."
+                        : `Project: ${selectedProject.name}`
+                    }
+                    control={
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          disabled={isSavingProjectAi}
+                          onClick={() => void enableAllProjectAi()}
+                        >
+                          Enable all
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          disabled={isSavingProjectAi}
+                          onClick={() => void disableAllProjectAi()}
+                        >
+                          Disable all
+                        </Button>
+                      </div>
+                    }
+                  />
+
+                  <div className="border-t border-border px-4 py-4 sm:px-5">
+                    <div className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
+                      <BrainCircuitIcon className="size-4" />
+                      Skills
+                    </div>
+                    <div className="space-y-3">
+                      {MEDUSA_PROJECT_SKILLS.map((entry) => (
+                        <label
+                          key={entry.id}
+                          className="flex items-start justify-between gap-4 rounded-lg border border-border/60 p-3"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium">{entry.name}</div>
+                            <div className="text-sm text-muted-foreground">{entry.description}</div>
+                            <a
+                              href={entry.referenceUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-primary underline-offset-4 hover:underline"
+                            >
+                              {entry.referenceUrl}
+                            </a>
+                          </div>
+                          <Switch
+                            checked={selectedProjectSkills.some((skill) => skill.id === entry.id)}
+                            disabled={isSavingProjectAi}
+                            onCheckedChange={(checked) => {
+                              void toggleProjectSkill(entry.id, Boolean(checked));
+                            }}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border px-4 py-4 sm:px-5">
+                    <div className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
+                      <BookCopyIcon className="size-4" />
+                      Knowledgebase
+                    </div>
+                    <div className="space-y-3">
+                      {MEDUSA_PROJECT_KNOWLEDGE_SOURCES.map((entry) => (
+                        <label
+                          key={entry.id}
+                          className="flex items-start justify-between gap-4 rounded-lg border border-border/60 p-3"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium">{entry.name}</div>
+                            <div className="text-sm text-muted-foreground">{entry.description}</div>
+                            <a
+                              href={entry.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-primary underline-offset-4 hover:underline"
+                            >
+                              {entry.url}
+                            </a>
+                          </div>
+                          <Switch
+                            checked={selectedProjectKnowledgeSources.some(
+                              (source) => source.id === entry.id,
+                            )}
+                            disabled={isSavingProjectAi}
+                            onCheckedChange={(checked) => {
+                              void toggleProjectKnowledge(entry.id, Boolean(checked));
+                            }}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border px-4 py-4 sm:px-5">
+                    <div className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
+                      <DatabaseZapIcon className="size-4" />
+                      MCP
+                    </div>
+                    <div className="space-y-3">
+                      {MEDUSA_PROJECT_MCP_SERVERS.map((entry) => {
+                        const inspection = inspectionResults[entry.id] ?? {
+                          data: null,
+                          error: null,
+                        };
+
+                        return (
+                          <div
+                            key={entry.id}
+                            className="space-y-3 rounded-lg border border-border/60 p-3"
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium">{entry.name}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  {entry.description}
+                                </div>
+                                <a
+                                  href={entry.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-xs text-primary underline-offset-4 hover:underline"
+                                >
+                                  {entry.url}
+                                </a>
+                              </div>
+                              <Switch
+                                checked={selectedProjectMcpServers.some(
+                                  (server) => server.id === entry.id,
+                                )}
+                                disabled={isSavingProjectAi}
+                                onCheckedChange={(checked) => {
+                                  void toggleProjectMcp(entry.id, Boolean(checked));
+                                }}
+                              />
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="xs"
+                                disabled={inspectingMcpId === entry.id}
+                                onClick={() => void inspectMcpServer(entry)}
+                              >
+                                {inspectingMcpId === entry.id ? "Inspecting..." : "Inspect MCP"}
+                              </Button>
+                            </div>
+                            {inspection.error ? (
+                              <p className="text-xs text-destructive">{inspection.error}</p>
+                            ) : null}
+                            {inspection.data ? (
+                              <div className="space-y-2 rounded-md border border-border/60 bg-muted/30 p-3 text-xs">
+                                <div>
+                                  <span className="font-medium text-foreground">
+                                    {inspection.data.serverName}
+                                  </span>
+                                  {inspection.data.serverVersion
+                                    ? ` v${inspection.data.serverVersion}`
+                                    : ""}
+                                </div>
+                                <div className="text-muted-foreground">
+                                  {inspection.data.instructions ??
+                                    "No server instructions reported."}
+                                </div>
+                                <div>
+                                  <span className="font-medium text-foreground">Tools:</span>{" "}
+                                  {inspection.data.tools.length > 0
+                                    ? inspection.data.tools.map((tool) => tool.name).join(", ")
+                                    : "No tools reported."}
+                                </div>
+                                <div>
+                                  <span className="font-medium text-foreground">Resources:</span>{" "}
+                                  {inspection.data.resources.length > 0
+                                    ? inspection.data.resources
+                                        .map((resource) => resource.name)
+                                        .join(", ")
+                                    : "No resources reported."}
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
             </SettingsSection>
 
             <SettingsSection
@@ -1305,7 +1743,7 @@ function SettingsRouteView() {
           </div>
         </div>
       </div>
-    </SidebarInset>
+    </div>
   );
 }
 

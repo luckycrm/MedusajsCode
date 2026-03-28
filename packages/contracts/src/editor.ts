@@ -22,5 +22,6 @@ export type EditorId = typeof EditorId.Type;
 export const OpenInEditorInput = Schema.Struct({
   cwd: TrimmedNonEmptyString,
   editor: EditorId,
+  workspaceRoot: Schema.optional(TrimmedNonEmptyString),
 });
 export type OpenInEditorInput = typeof OpenInEditorInput.Type;

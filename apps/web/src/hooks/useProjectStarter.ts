@@ -52,9 +52,16 @@ function joinPath(basePath: string, nextSegment: string): string {
 function deriveRepoFolderName(repoUrl: string): string {
   const trimmed = repoUrl.trim().replace(/\/+$/, "");
   const withoutGitSuffix = trimmed.replace(/\.git$/i, "");
-  const lastSlashIndex = Math.max(withoutGitSuffix.lastIndexOf("/"), withoutGitSuffix.lastIndexOf(":"));
-  const candidate = lastSlashIndex >= 0 ? withoutGitSuffix.slice(lastSlashIndex + 1) : withoutGitSuffix;
-  const sanitized = candidate.trim().replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  const lastSlashIndex = Math.max(
+    withoutGitSuffix.lastIndexOf("/"),
+    withoutGitSuffix.lastIndexOf(":"),
+  );
+  const candidate =
+    lastSlashIndex >= 0 ? withoutGitSuffix.slice(lastSlashIndex + 1) : withoutGitSuffix;
+  const sanitized = candidate
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
   return sanitized || "repo";
 }
 
@@ -88,7 +95,9 @@ export function useProjectStarter() {
         envMode: appSettings.defaultThreadEnvMode,
       });
 
-      return useComposerDraftStore.getState().getDraftThreadByProjectId(projectId)?.threadId ?? null;
+      return (
+        useComposerDraftStore.getState().getDraftThreadByProjectId(projectId)?.threadId ?? null
+      );
     },
     [appSettings.defaultThreadEnvMode, handleNewThread, navigate, threads],
   );
@@ -175,7 +184,8 @@ export function useProjectStarter() {
         throw new Error("Choose a destination folder first.");
       }
 
-      const folderName = normalizePathInput(input.folderName ?? "") || deriveRepoFolderName(repoUrl);
+      const folderName =
+        normalizePathInput(input.folderName ?? "") || deriveRepoFolderName(repoUrl);
       const targetPath = joinPath(parentDirectory, folderName);
 
       // Create the target directory before registering the project. The starter

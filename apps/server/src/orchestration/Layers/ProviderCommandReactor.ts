@@ -152,6 +152,9 @@ const make = Effect.gen(function* () {
     );
 
   const threadModelSelections = new Map<string, ModelSelection>();
+  const threadMcpServerSignatures = new Map<string, string>();
+
+  const mcpSignatureFor = (value: unknown): string => JSON.stringify(value ?? []);
 
   const appendProviderFailureActivity = (input: {
     readonly threadId: ThreadId;
@@ -218,6 +221,9 @@ const make = Effect.gen(function* () {
     }
 
     const desiredRuntimeMode = thread.runtimeMode;
+    const project = readModel.projects.find((entry) => entry.id === thread.projectId);
+    const desiredMcpServers = project?.mcpServers ?? [];
+    const desiredMcpSignature = mcpSignatureFor(desiredMcpServers);
     const currentProvider: ProviderKind | undefined = Schema.is(ProviderKind)(
       thread.session?.providerName,
     )
@@ -256,6 +262,7 @@ const make = Effect.gen(function* () {
         ...(preferredProvider ? { provider: preferredProvider } : {}),
         ...(effectiveCwd ? { cwd: effectiveCwd } : {}),
         modelSelection: desiredModelSelection,
+        ...(desiredMcpServers.length > 0 ? { mcpServers: desiredMcpServers } : {}),
         ...(input?.resumeCursor !== undefined ? { resumeCursor: input.resumeCursor } : {}),
         runtimeMode: desiredRuntimeMode,
       });
@@ -297,13 +304,18 @@ const make = Effect.gen(function* () {
         currentProvider === "claudeAgent" &&
         requestedModelSelection !== undefined &&
         !Equal.equals(previousModelSelection, requestedModelSelection);
+      const previousMcpSignature = threadMcpServerSignatures.get(threadId);
+      const shouldRestartForMcpServerChange =
+        previousMcpSignature !== undefined && previousMcpSignature !== desiredMcpSignature;
 
       if (
         !runtimeModeChanged &&
         !providerChanged &&
         !shouldRestartForModelChange &&
-        !shouldRestartForModelSelectionChange
+        !shouldRestartForModelSelectionChange &&
+        !shouldRestartForMcpServerChange
       ) {
+        threadMcpServerSignatures.set(threadId, desiredMcpSignature);
         return existingSessionThreadId;
       }
 
@@ -323,6 +335,7 @@ const make = Effect.gen(function* () {
         modelChanged,
         shouldRestartForModelChange,
         shouldRestartForModelSelectionChange,
+        shouldRestartForMcpServerChange,
         hasResumeCursor: resumeCursor !== undefined,
       });
       const restartedSession = yield* startProviderSession(
@@ -336,11 +349,13 @@ const make = Effect.gen(function* () {
         runtimeMode: restartedSession.runtimeMode,
       });
       yield* bindSessionToThread(restartedSession);
+      threadMcpServerSignatures.set(threadId, desiredMcpSignature);
       return restartedSession.threadId;
     }
 
     const startedSession = yield* startProviderSession(undefined);
     yield* bindSessionToThread(startedSession);
+    threadMcpServerSignatures.set(threadId, desiredMcpSignature);
     return startedSession.threadId;
   });
 

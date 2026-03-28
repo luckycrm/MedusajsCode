@@ -183,6 +183,9 @@ export function projectEvent(
             workspaceRoot: payload.workspaceRoot,
             defaultModelSelection: payload.defaultModelSelection,
             scripts: payload.scripts,
+            skills: payload.skills,
+            knowledgeSources: payload.knowledgeSources,
+            mcpServers: payload.mcpServers,
             createdAt: payload.createdAt,
             updatedAt: payload.updatedAt,
             deletedAt: null,
@@ -215,6 +218,11 @@ export function projectEvent(
                     ? { defaultModelSelection: payload.defaultModelSelection }
                     : {}),
                   ...(payload.scripts !== undefined ? { scripts: payload.scripts } : {}),
+                  ...(payload.skills !== undefined ? { skills: payload.skills } : {}),
+                  ...(payload.knowledgeSources !== undefined
+                    ? { knowledgeSources: payload.knowledgeSources }
+                    : {}),
+                  ...(payload.mcpServers !== undefined ? { mcpServers: payload.mcpServers } : {}),
                   updatedAt: payload.updatedAt,
                 }
               : project,

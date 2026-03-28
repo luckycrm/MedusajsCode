@@ -37,6 +37,7 @@ export interface WorkLogEntry {
   createdAt: string;
   label: string;
   detail?: string;
+  resultPreview?: string;
   command?: string;
   changedFiles?: ReadonlyArray<string>;
   tone: "thinking" | "tool" | "info" | "error";
@@ -507,6 +508,10 @@ function toDerivedWorkLogEntry(activity: OrchestrationThreadActivity): DerivedWo
       entry.detail = detail;
     }
   }
+  const resultPreview = extractToolResultPreview(payload, itemType);
+  if (resultPreview) {
+    entry.resultPreview = resultPreview;
+  }
   if (command) {
     entry.command = command;
   }
@@ -566,6 +571,7 @@ function mergeDerivedWorkLogEntries(
 ): DerivedWorkLogEntry {
   const changedFiles = mergeChangedFiles(previous.changedFiles, next.changedFiles);
   const detail = next.detail ?? previous.detail;
+  const resultPreview = next.resultPreview ?? previous.resultPreview;
   const command = next.command ?? previous.command;
   const toolTitle = next.toolTitle ?? previous.toolTitle;
   const itemType = next.itemType ?? previous.itemType;
@@ -575,6 +581,7 @@ function mergeDerivedWorkLogEntries(
     ...previous,
     ...next,
     ...(detail ? { detail } : {}),
+    ...(resultPreview ? { resultPreview } : {}),
     ...(command ? { command } : {}),
     ...(changedFiles.length > 0 ? { changedFiles } : {}),
     ...(toolTitle ? { toolTitle } : {}),
@@ -666,6 +673,92 @@ function extractToolCommand(payload: Record<string, unknown> | null): string | n
 
 function extractToolTitle(payload: Record<string, unknown> | null): string | null {
   return asTrimmedString(payload?.title);
+}
+
+function truncatePreview(value: string, maxLength = 320): string {
+  const trimmed = value.trim();
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+  return `${trimmed.slice(0, maxLength).trimEnd()}...`;
+}
+
+function collectResultText(value: unknown, target: string[], depth: number) {
+  if (depth > 5 || target.length >= 3) {
+    return;
+  }
+
+  const direct = asTrimmedString(value);
+  if (direct) {
+    target.push(direct);
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      collectResultText(entry, target, depth + 1);
+      if (target.length >= 3) {
+        return;
+      }
+    }
+    return;
+  }
+
+  const record = asRecord(value);
+  if (!record) {
+    return;
+  }
+
+  for (const preferredKey of [
+    "text",
+    "markdown",
+    "content",
+    "output",
+    "response",
+    "result",
+    "answer",
+    "message",
+    "actual_content",
+    "actualContent",
+  ]) {
+    if (preferredKey in record) {
+      collectResultText(record[preferredKey], target, depth + 1);
+      if (target.length >= 3) {
+        return;
+      }
+    }
+  }
+}
+
+function extractToolResultPreview(
+  payload: Record<string, unknown> | null,
+  itemType: WorkLogEntry["itemType"] | undefined,
+): string | null {
+  if (itemType !== "mcp_tool_call") {
+    return null;
+  }
+
+  const data = asRecord(payload?.data);
+  const item = asRecord(data?.item);
+  const itemResult = asRecord(item?.result);
+  const candidates = [itemResult, asRecord(data?.result), item, data];
+  const fragments: string[] = [];
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+    collectResultText(candidate, fragments, 0);
+    if (fragments.length > 0) {
+      break;
+    }
+  }
+
+  if (fragments.length === 0) {
+    return null;
+  }
+
+  const joined = fragments.join("\n\n").trim();
+  return joined.length > 0 ? truncatePreview(joined) : null;
 }
 
 function stripTrailingExitCode(value: string): {

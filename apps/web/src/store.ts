@@ -151,6 +151,9 @@ function mapProjectsFromReadModel(
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
       scripts: project.scripts.map((script) => ({ ...script })),
+      skills: project.skills.map((skill) => ({ ...skill })),
+      knowledgeSources: project.knowledgeSources.map((source) => ({ ...source })),
+      mcpServers: project.mcpServers.map((server) => ({ ...server })),
     } satisfies Project;
   });
 

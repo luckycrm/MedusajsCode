@@ -6,8 +6,12 @@ vi.hoisted(() => {
     const storeMock: Record<string, string> = {};
     const fakeStorage = {
       getItem: vi.fn((key: string) => storeMock[key] || null),
-      setItem: vi.fn((key: string, value: string) => { storeMock[key] = value.toString(); }),
-      removeItem: vi.fn((key: string) => { delete storeMock[key]; }),
+      setItem: vi.fn((key: string, value: string) => {
+        storeMock[key] = value.toString();
+      }),
+      removeItem: vi.fn((key: string) => {
+        delete storeMock[key];
+      }),
       clear: vi.fn(() => {
         Object.keys(storeMock).forEach((key) => delete storeMock[key]);
       }),

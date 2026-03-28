@@ -291,6 +291,9 @@ describe("wsNativeApi", () => {
         workspaceRoot: "/tmp/workspace",
         defaultModelSelection: null,
         scripts: [],
+        skills: [],
+        knowledgeSources: [],
+        mcpServers: [],
         createdAt: "2026-02-24T00:00:00.000Z",
         updatedAt: "2026-02-24T00:00:00.000Z",
       },
@@ -403,6 +406,36 @@ describe("wsNativeApi", () => {
     expect(requestMock).toHaveBeenCalledWith(ORCHESTRATION_WS_METHODS.getFullThreadDiff, {
       threadId: "thread-1",
       toTurnCount: 1,
+    });
+  });
+
+  it("forwards knowledge source resolution requests to the server websocket method", async () => {
+    requestMock.mockResolvedValue({ entries: [] });
+    const { createWsNativeApi } = await import("./wsNativeApi");
+
+    const api = createWsNativeApi();
+    await api.server.resolveKnowledgeSources({
+      sources: [
+        {
+          id: "medusa-llms-full",
+          name: "Medusa llms-full.txt",
+          description: "Full docs.",
+          kind: "llms-full",
+          url: "https://docs.medusajs.com/llms-full.txt",
+        },
+      ],
+    });
+
+    expect(requestMock).toHaveBeenCalledWith(WS_METHODS.serverResolveKnowledgeSources, {
+      sources: [
+        {
+          id: "medusa-llms-full",
+          name: "Medusa llms-full.txt",
+          description: "Full docs.",
+          kind: "llms-full",
+          url: "https://docs.medusajs.com/llms-full.txt",
+        },
+      ],
     });
   });
 

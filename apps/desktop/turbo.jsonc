@@ -7,7 +7,7 @@
       "outputs": ["dist-electron/**"],
     },
     "dev": {
-      "dependsOn": ["mc#build"],
+      "dependsOn": ["medusajscode#build"],
       "persistent": true,
     },
     "start": {

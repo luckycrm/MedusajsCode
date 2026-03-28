@@ -8,6 +8,7 @@ export const VscodeEntryIcon = memo(function VscodeEntryIcon(props: {
   kind: "file" | "directory";
   theme: "light" | "dark";
   className?: string;
+  desaturate?: boolean;
 }) {
   const [failedIconUrl, setFailedIconUrl] = useState<string | null>(null);
   const iconUrl = useMemo(
@@ -29,7 +30,11 @@ export const VscodeEntryIcon = memo(function VscodeEntryIcon(props: {
       src={iconUrl}
       alt=""
       aria-hidden="true"
-      className={cn("size-4 shrink-0", props.className)}
+      className={cn(
+        "size-4 shrink-0",
+        props.desaturate && props.kind === "directory" && "grayscale opacity-80",
+        props.className,
+      )}
       loading="lazy"
       onError={() => setFailedIconUrl(iconUrl)}
     />

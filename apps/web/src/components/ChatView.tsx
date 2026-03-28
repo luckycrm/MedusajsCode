@@ -119,6 +119,7 @@ import {
   useGlobalFooterContent,
   useGlobalHeaderContent,
 } from "../routes/_chat";
+import { prependProjectAiContext } from "../projectAiPack";
 import { newCommandId, newMessageId, newThreadId } from "~/lib/utils";
 import { readNativeApi } from "~/nativeApi";
 import {
@@ -1560,6 +1561,45 @@ export default function ChatView({ threadId }: ChatViewProps) {
     },
     [activeProject, persistProjectScripts],
   );
+  const knowledgeContextCacheRef = useRef(new Map<string, string>());
+  const resolveProjectKnowledgeEntries = useCallback(async (project: typeof activeProject) => {
+    if (!project || (project.knowledgeSources?.length ?? 0) === 0) {
+      return [];
+    }
+
+    const api = readNativeApi();
+    if (!api) {
+      return [];
+    }
+
+    const orderedSources = project.knowledgeSources ?? [];
+    const cache = knowledgeContextCacheRef.current;
+    const uncachedSources = orderedSources.filter(
+      (source) => !cache.has(`${source.id}:${source.url}`),
+    );
+
+    if (uncachedSources.length > 0) {
+      const resolved = await api.server.resolveKnowledgeSources({ sources: uncachedSources });
+      for (const entry of resolved.entries) {
+        const matchingSource = uncachedSources.find((source) => source.id === entry.sourceId);
+        if (matchingSource) {
+          cache.set(`${matchingSource.id}:${matchingSource.url}`, JSON.stringify(entry));
+        }
+      }
+    }
+
+    return orderedSources.flatMap((source) => {
+      const raw = cache.get(`${source.id}:${source.url}`);
+      if (!raw) {
+        return [];
+      }
+      try {
+        return [JSON.parse(raw)];
+      } catch {
+        return [];
+      }
+    });
+  }, []);
   const updateProjectScript = useCallback(
     async (scriptId: string, input: NewProjectScriptInput) => {
       if (!activeProject) return;
@@ -2539,12 +2579,17 @@ export default function ChatView({ threadId }: ChatViewProps) {
     );
     const messageIdForSend = newMessageId();
     const messageCreatedAt = new Date().toISOString();
+    const resolvedKnowledgeEntries = await resolveProjectKnowledgeEntries(activeProject);
     const outgoingMessageText = formatOutgoingPrompt({
       provider: selectedProvider,
       model: selectedModel,
       models: selectedProviderModels,
       effort: selectedPromptEffort,
-      text: messageTextForSend || IMAGE_ONLY_BOOTSTRAP_PROMPT,
+      text: prependProjectAiContext({
+        project: activeProject,
+        resolvedKnowledgeEntries,
+        text: messageTextForSend || IMAGE_ONLY_BOOTSTRAP_PROMPT,
+      }),
     });
     const turnAttachmentsPromise = Promise.all(
       composerImagesSnapshot.map(async (image) => ({
@@ -2961,12 +3006,17 @@ export default function ChatView({ threadId }: ChatViewProps) {
       const threadIdForSend = activeThread.id;
       const messageIdForSend = newMessageId();
       const messageCreatedAt = new Date().toISOString();
+      const resolvedKnowledgeEntries = await resolveProjectKnowledgeEntries(activeProject);
       const outgoingMessageText = formatOutgoingPrompt({
         provider: selectedProvider,
         model: selectedModel,
         models: selectedProviderModels,
         effort: selectedPromptEffort,
-        text: trimmed,
+        text: prependProjectAiContext({
+          project: activeProject,
+          resolvedKnowledgeEntries,
+          text: trimmed,
+        }),
       });
 
       sendInFlightRef.current = true;
@@ -3081,12 +3131,17 @@ export default function ChatView({ threadId }: ChatViewProps) {
     const nextThreadId = newThreadId();
     const planMarkdown = activeProposedPlan.planMarkdown;
     const implementationPrompt = buildPlanImplementationPrompt(planMarkdown);
+    const resolvedKnowledgeEntries = await resolveProjectKnowledgeEntries(activeProject);
     const outgoingImplementationPrompt = formatOutgoingPrompt({
       provider: selectedProvider,
       model: selectedModel,
       models: selectedProviderModels,
       effort: selectedPromptEffort,
-      text: implementationPrompt,
+      text: prependProjectAiContext({
+        project: activeProject,
+        resolvedKnowledgeEntries,
+        text: implementationPrompt,
+      }),
     });
     const nextThreadTitle = truncateTitle(buildPlanImplementationThreadTitle(planMarkdown));
     const nextThreadModelSelection: ModelSelection = selectedModelSelection;
@@ -3565,9 +3620,10 @@ export default function ChatView({ threadId }: ChatViewProps) {
   const electronFooterControls = useMemo(
     () => (
       <ChatHeader
-        className="w-full min-w-0 flex-1 justify-start"
+        className="w-auto min-w-0 flex-none justify-start"
         activeThreadId={activeThread.id}
         activeProjectName={activeProject?.name}
+        activeProject={activeProject}
         isGitRepo={isGitRepo}
         openInCwd={gitCwd}
         activeProjectScripts={activeProject?.scripts}
@@ -3582,6 +3638,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
         terminalAvailable={activeProject !== undefined}
         terminalOpen={terminalState.terminalOpen}
         showTerminalToggle={false}
+        expandUtilityLabels
         terminalToggleShortcutLabel={terminalToggleShortcutLabel}
         diffToggleShortcutLabel={diffPanelShortcutLabel}
         gitCwd={gitCwd}
@@ -3620,17 +3677,20 @@ export default function ChatView({ threadId }: ChatViewProps) {
   const electronHeaderControls = useMemo(
     () =>
       activeProject?.scripts ? (
-        <ProjectScriptsControl
-          scripts={activeProject.scripts}
-          keybindings={keybindings}
-          preferredScriptId={lastInvokedScriptByProjectId[activeProject.id] ?? null}
-          onRunScript={(script) => {
-            void runProjectScript(script);
-          }}
-          onAddScript={saveProjectScript}
-          onUpdateScript={updateProjectScript}
-          onDeleteScript={deleteProjectScript}
-        />
+        <div className="flex items-center gap-2">
+          <ProjectScriptsControl
+            scripts={activeProject.scripts}
+            keybindings={keybindings}
+            preferredScriptId={lastInvokedScriptByProjectId[activeProject.id] ?? null}
+            forceExpanded
+            onRunScript={(script) => {
+              void runProjectScript(script);
+            }}
+            onAddScript={saveProjectScript}
+            onUpdateScript={updateProjectScript}
+            onDeleteScript={deleteProjectScript}
+          />
+        </div>
       ) : null,
     [
       activeProject,
@@ -3656,12 +3716,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
       setHeaderContent(null);
       setFooterContent(null);
     };
-  }, [
-    electronFooterControls,
-    electronHeaderControls,
-    setFooterContent,
-    setHeaderContent,
-  ]);
+  }, [electronFooterControls, electronHeaderControls, setFooterContent, setHeaderContent]);
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
@@ -3929,302 +3984,304 @@ export default function ChatView({ threadId }: ChatViewProps) {
                             : "flex-wrap gap-2 sm:flex-nowrap sm:gap-0",
                         )}
                       >
-                      <div
-                        className={cn(
-                          "flex min-w-0 flex-1 items-center",
-                          isComposerFooterCompact
-                            ? "gap-1 overflow-hidden"
-                            : "gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:min-w-max sm:overflow-visible",
-                        )}
-                      >
-                        {/* Provider/model picker */}
-                        <ProviderModelPicker
-                          compact={isComposerFooterCompact}
-                          provider={selectedProvider}
-                          model={selectedModelForPickerWithCustomFallback}
-                          lockedProvider={lockedProvider}
-                          providers={providerStatuses}
-                          modelOptionsByProvider={modelOptionsByProvider}
-                          {...(composerProviderState.modelPickerIconClassName
-                            ? {
-                                activeProviderIconClassName:
-                                  composerProviderState.modelPickerIconClassName,
-                              }
-                            : {})}
-                          onProviderModelChange={onProviderModelSelect}
-                        />
-
-                        {isComposerFooterCompact ? (
-                          <CompactComposerControlsMenu
-                            activePlan={Boolean(
-                              activePlan || sidebarProposedPlan || planSidebarOpen,
-                            )}
-                            interactionMode={interactionMode}
-                            planSidebarOpen={planSidebarOpen}
-                            runtimeMode={runtimeMode}
-                            traitsMenuContent={providerTraitsMenuContent}
-                            onToggleInteractionMode={toggleInteractionMode}
-                            onTogglePlanSidebar={togglePlanSidebar}
-                            onToggleRuntimeMode={toggleRuntimeMode}
+                        <div
+                          className={cn(
+                            "flex min-w-0 flex-1 items-center",
+                            isComposerFooterCompact
+                              ? "gap-1 overflow-hidden"
+                              : "gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:min-w-max sm:overflow-visible",
+                          )}
+                        >
+                          {/* Provider/model picker */}
+                          <ProviderModelPicker
+                            compact={isComposerFooterCompact}
+                            provider={selectedProvider}
+                            model={selectedModelForPickerWithCustomFallback}
+                            lockedProvider={lockedProvider}
+                            providers={providerStatuses}
+                            modelOptionsByProvider={modelOptionsByProvider}
+                            {...(composerProviderState.modelPickerIconClassName
+                              ? {
+                                  activeProviderIconClassName:
+                                    composerProviderState.modelPickerIconClassName,
+                                }
+                              : {})}
+                            onProviderModelChange={onProviderModelSelect}
                           />
-                        ) : (
-                          <>
-                            {providerTraitsPicker ? (
-                              <>
-                                <Separator
-                                  orientation="vertical"
-                                  className="mx-0.5 hidden h-4 sm:block"
-                                />
-                                {providerTraitsPicker}
-                              </>
-                            ) : null}
 
-                            <Separator
-                              orientation="vertical"
-                              className="mx-0.5 hidden h-4 sm:block"
+                          {isComposerFooterCompact ? (
+                            <CompactComposerControlsMenu
+                              activePlan={Boolean(
+                                activePlan || sidebarProposedPlan || planSidebarOpen,
+                              )}
+                              interactionMode={interactionMode}
+                              planSidebarOpen={planSidebarOpen}
+                              runtimeMode={runtimeMode}
+                              traitsMenuContent={providerTraitsMenuContent}
+                              onToggleInteractionMode={toggleInteractionMode}
+                              onTogglePlanSidebar={togglePlanSidebar}
+                              onToggleRuntimeMode={toggleRuntimeMode}
                             />
+                          ) : (
+                            <>
+                              {providerTraitsPicker ? (
+                                <>
+                                  <Separator
+                                    orientation="vertical"
+                                    className="mx-0.5 hidden h-4 sm:block"
+                                  />
+                                  {providerTraitsPicker}
+                                </>
+                              ) : null}
 
-                            <Button
-                              variant="ghost"
-                              className="shrink-0 whitespace-nowrap px-2 text-muted-foreground/70 hover:text-foreground/80 sm:px-3"
-                              size="sm"
-                              type="button"
-                              onClick={toggleInteractionMode}
-                              title={
-                                interactionMode === "plan"
-                                  ? "Plan mode — click to return to normal chat mode"
-                                  : "Default mode — click to enter plan mode"
-                              }
-                            >
-                              <BotIcon />
-                              <span className="sr-only sm:not-sr-only">
-                                {interactionMode === "plan" ? "Plan" : "Chat"}
-                              </span>
-                            </Button>
+                              <Separator
+                                orientation="vertical"
+                                className="mx-0.5 hidden h-4 sm:block"
+                              />
 
-                            <Separator
-                              orientation="vertical"
-                              className="mx-0.5 hidden h-4 sm:block"
-                            />
-
-                            <Button
-                              variant="ghost"
-                              className="shrink-0 whitespace-nowrap px-2 text-muted-foreground/70 hover:text-foreground/80 sm:px-3"
-                              size="sm"
-                              type="button"
-                              onClick={() =>
-                                void handleRuntimeModeChange(
-                                  runtimeMode === "full-access"
-                                    ? "approval-required"
-                                    : "full-access",
-                                )
-                              }
-                              title={
-                                runtimeMode === "full-access"
-                                  ? "Full access — click to require approvals"
-                                  : "Approval required — click for full access"
-                              }
-                            >
-                              {runtimeMode === "full-access" ? <LockOpenIcon /> : <LockIcon />}
-                              <span className="sr-only sm:not-sr-only">
-                                {runtimeMode === "full-access" ? "Full access" : "Supervised"}
-                              </span>
-                            </Button>
-
-                            {activePlan || sidebarProposedPlan || planSidebarOpen ? (
-                              <>
-                                <Separator
-                                  orientation="vertical"
-                                  className="mx-0.5 hidden h-4 sm:block"
-                                />
-                                <Button
-                                  variant="ghost"
-                                  className={cn(
-                                    "shrink-0 whitespace-nowrap px-2 sm:px-3",
-                                    planSidebarOpen
-                                      ? "text-blue-400 hover:text-blue-300"
-                                      : "text-muted-foreground/70 hover:text-foreground/80",
-                                  )}
-                                  size="sm"
-                                  type="button"
-                                  onClick={togglePlanSidebar}
-                                  title={
-                                    planSidebarOpen ? "Hide plan sidebar" : "Show plan sidebar"
-                                  }
-                                >
-                                  <ListTodoIcon />
-                                  <span className="sr-only sm:not-sr-only">Plan</span>
-                                </Button>
-                              </>
-                            ) : null}
-                          </>
-                        )}
-                      </div>
-
-                      {/* Right side: send / stop button */}
-                      <div
-                        data-chat-composer-actions="right"
-                        className="flex shrink-0 items-center gap-2"
-                      >
-                        {activeContextWindow ? (
-                          <ContextWindowMeter usage={activeContextWindow} />
-                        ) : null}
-                        {isPreparingWorktree ? (
-                          <span className="text-muted-foreground/70 text-xs">
-                            Preparing worktree...
-                          </span>
-                        ) : null}
-                        {activePendingProgress ? (
-                          <div className="flex items-center gap-2">
-                            {activePendingProgress.questionIndex > 0 ? (
                               <Button
+                                variant="ghost"
+                                className="shrink-0 whitespace-nowrap px-2 text-muted-foreground/70 hover:text-foreground/80 sm:px-3"
                                 size="sm"
-                                variant="outline"
-                                className="rounded-full"
-                                onClick={onPreviousActivePendingUserInputQuestion}
-                                disabled={activePendingIsResponding}
+                                type="button"
+                                onClick={toggleInteractionMode}
+                                title={
+                                  interactionMode === "plan"
+                                    ? "Plan mode — click to return to normal chat mode"
+                                    : "Default mode — click to enter plan mode"
+                                }
                               >
-                                Previous
+                                <BotIcon />
+                                <span className="sr-only sm:not-sr-only">
+                                  {interactionMode === "plan" ? "Plan" : "Chat"}
+                                </span>
                               </Button>
-                            ) : null}
-                            <Button
-                              type="submit"
-                              size="sm"
-                              className="rounded-full px-4"
-                              disabled={
-                                activePendingIsResponding ||
-                                (activePendingProgress.isLastQuestion
-                                  ? !activePendingResolvedAnswers
-                                  : !activePendingProgress.canAdvance)
-                              }
-                            >
-                              {activePendingIsResponding
-                                ? "Submitting..."
-                                : activePendingProgress.isLastQuestion
-                                  ? "Submit answers"
-                                  : "Next question"}
-                            </Button>
-                          </div>
-                        ) : phase === "running" ? (
-                          <button
-                            type="button"
-                            className="flex size-8 cursor-pointer items-center justify-center rounded-full bg-rose-500/90 text-white transition-all duration-150 hover:bg-rose-500 hover:scale-105 sm:h-8 sm:w-8"
-                            onClick={() => void onInterrupt()}
-                            aria-label="Stop generation"
-                          >
-                            <svg
-                              width="12"
-                              height="12"
-                              viewBox="0 0 12 12"
-                              fill="currentColor"
-                              aria-hidden="true"
-                            >
-                              <rect x="2" y="2" width="8" height="8" rx="1.5" />
-                            </svg>
-                          </button>
-                        ) : pendingUserInputs.length === 0 ? (
-                          showPlanFollowUpPrompt ? (
-                            prompt.trim().length > 0 ? (
+
+                              <Separator
+                                orientation="vertical"
+                                className="mx-0.5 hidden h-4 sm:block"
+                              />
+
+                              <Button
+                                variant="ghost"
+                                className="shrink-0 whitespace-nowrap px-2 text-muted-foreground/70 hover:text-foreground/80 sm:px-3"
+                                size="sm"
+                                type="button"
+                                onClick={() =>
+                                  void handleRuntimeModeChange(
+                                    runtimeMode === "full-access"
+                                      ? "approval-required"
+                                      : "full-access",
+                                  )
+                                }
+                                title={
+                                  runtimeMode === "full-access"
+                                    ? "Full access — click to require approvals"
+                                    : "Approval required — click for full access"
+                                }
+                              >
+                                {runtimeMode === "full-access" ? <LockOpenIcon /> : <LockIcon />}
+                                <span className="sr-only sm:not-sr-only">
+                                  {runtimeMode === "full-access" ? "Full access" : "Supervised"}
+                                </span>
+                              </Button>
+
+                              {activePlan || sidebarProposedPlan || planSidebarOpen ? (
+                                <>
+                                  <Separator
+                                    orientation="vertical"
+                                    className="mx-0.5 hidden h-4 sm:block"
+                                  />
+                                  <Button
+                                    variant="ghost"
+                                    className={cn(
+                                      "shrink-0 whitespace-nowrap px-2 sm:px-3",
+                                      planSidebarOpen
+                                        ? "text-blue-400 hover:text-blue-300"
+                                        : "text-muted-foreground/70 hover:text-foreground/80",
+                                    )}
+                                    size="sm"
+                                    type="button"
+                                    onClick={togglePlanSidebar}
+                                    title={
+                                      planSidebarOpen ? "Hide plan sidebar" : "Show plan sidebar"
+                                    }
+                                  >
+                                    <ListTodoIcon />
+                                    <span className="sr-only sm:not-sr-only">Plan</span>
+                                  </Button>
+                                </>
+                              ) : null}
+                            </>
+                          )}
+                        </div>
+
+                        {/* Right side: send / stop button */}
+                        <div
+                          data-chat-composer-actions="right"
+                          className="flex shrink-0 items-center gap-2"
+                        >
+                          {activeContextWindow ? (
+                            <ContextWindowMeter usage={activeContextWindow} />
+                          ) : null}
+                          {isPreparingWorktree ? (
+                            <span className="text-muted-foreground/70 text-xs">
+                              Preparing worktree...
+                            </span>
+                          ) : null}
+                          {activePendingProgress ? (
+                            <div className="flex items-center gap-2">
+                              {activePendingProgress.questionIndex > 0 ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="rounded-full"
+                                  onClick={onPreviousActivePendingUserInputQuestion}
+                                  disabled={activePendingIsResponding}
+                                >
+                                  Previous
+                                </Button>
+                              ) : null}
                               <Button
                                 type="submit"
                                 size="sm"
-                                className="h-9 rounded-full px-4 sm:h-8"
-                                disabled={isSendBusy || isConnecting}
+                                className="rounded-full px-4"
+                                disabled={
+                                  activePendingIsResponding ||
+                                  (activePendingProgress.isLastQuestion
+                                    ? !activePendingResolvedAnswers
+                                    : !activePendingProgress.canAdvance)
+                                }
                               >
-                                {isConnecting || isSendBusy ? "Sending..." : "Refine"}
+                                {activePendingIsResponding
+                                  ? "Submitting..."
+                                  : activePendingProgress.isLastQuestion
+                                    ? "Submit answers"
+                                    : "Next question"}
                               </Button>
-                            ) : (
-                              <div className="flex items-center">
+                            </div>
+                          ) : phase === "running" ? (
+                            <button
+                              type="button"
+                              className="flex size-8 cursor-pointer items-center justify-center rounded-full bg-rose-500/90 text-white transition-all duration-150 hover:bg-rose-500 hover:scale-105 sm:h-8 sm:w-8"
+                              onClick={() => void onInterrupt()}
+                              aria-label="Stop generation"
+                            >
+                              <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 12 12"
+                                fill="currentColor"
+                                aria-hidden="true"
+                              >
+                                <rect x="2" y="2" width="8" height="8" rx="1.5" />
+                              </svg>
+                            </button>
+                          ) : pendingUserInputs.length === 0 ? (
+                            showPlanFollowUpPrompt ? (
+                              prompt.trim().length > 0 ? (
                                 <Button
                                   type="submit"
                                   size="sm"
-                                  className="h-9 rounded-l-full rounded-r-none px-4 sm:h-8"
+                                  className="h-9 rounded-full px-4 sm:h-8"
                                   disabled={isSendBusy || isConnecting}
                                 >
-                                  {isConnecting || isSendBusy ? "Sending..." : "Implement"}
+                                  {isConnecting || isSendBusy ? "Sending..." : "Refine"}
                                 </Button>
-                                <Menu>
-                                  <MenuTrigger
-                                    render={
-                                      <Button
-                                        size="sm"
-                                        variant="default"
-                                        className="h-9 rounded-l-none rounded-r-full border-l-white/12 px-2 sm:h-8"
-                                        aria-label="Implementation actions"
-                                        disabled={isSendBusy || isConnecting}
-                                      />
-                                    }
-                                  >
-                                    <ChevronDownIcon className="size-3.5" />
-                                  </MenuTrigger>
-                                  <MenuPopup align="end" side="top">
-                                    <MenuItem
-                                      disabled={isSendBusy || isConnecting}
-                                      onClick={() => void onImplementPlanInNewThread()}
-                                    >
-                                      Implement in a new thread
-                                    </MenuItem>
-                                  </MenuPopup>
-                                </Menu>
-                              </div>
-                            )
-                          ) : (
-                            <button
-                              type="submit"
-                              className="flex h-9 w-9 enabled:cursor-pointer items-center justify-center rounded-full bg-primary/90 text-primary-foreground transition-all duration-150 hover:bg-primary hover:scale-105 disabled:pointer-events-none disabled:opacity-30 disabled:hover:scale-100 sm:h-8 sm:w-8"
-                              disabled={
-                                isSendBusy || isConnecting || !composerSendState.hasSendableContent
-                              }
-                              aria-label={
-                                isConnecting
-                                  ? "Connecting"
-                                  : isPreparingWorktree
-                                    ? "Preparing worktree"
-                                    : isSendBusy
-                                      ? "Sending"
-                                      : "Send message"
-                              }
-                            >
-                              {isConnecting || isSendBusy ? (
-                                <svg
-                                  width="14"
-                                  height="14"
-                                  viewBox="0 0 14 14"
-                                  fill="none"
-                                  className="animate-spin"
-                                  aria-hidden="true"
-                                >
-                                  <circle
-                                    cx="7"
-                                    cy="7"
-                                    r="5.5"
-                                    stroke="currentColor"
-                                    strokeWidth="1.5"
-                                    strokeLinecap="round"
-                                    strokeDasharray="20 12"
-                                  />
-                                </svg>
                               ) : (
-                                <svg
-                                  width="14"
-                                  height="14"
-                                  viewBox="0 0 14 14"
-                                  fill="none"
-                                  aria-hidden="true"
-                                >
-                                  <path
-                                    d="M7 11.5V2.5M7 2.5L3 6.5M7 2.5L11 6.5"
-                                    stroke="currentColor"
-                                    strokeWidth="1.8"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  />
-                                </svg>
-                              )}
-                            </button>
-                          )
-                        ) : null}
-                      </div>
+                                <div className="flex items-center">
+                                  <Button
+                                    type="submit"
+                                    size="sm"
+                                    className="h-9 rounded-l-full rounded-r-none px-4 sm:h-8"
+                                    disabled={isSendBusy || isConnecting}
+                                  >
+                                    {isConnecting || isSendBusy ? "Sending..." : "Implement"}
+                                  </Button>
+                                  <Menu>
+                                    <MenuTrigger
+                                      render={
+                                        <Button
+                                          size="sm"
+                                          variant="default"
+                                          className="h-9 rounded-l-none rounded-r-full border-l-white/12 px-2 sm:h-8"
+                                          aria-label="Implementation actions"
+                                          disabled={isSendBusy || isConnecting}
+                                        />
+                                      }
+                                    >
+                                      <ChevronDownIcon className="size-3.5" />
+                                    </MenuTrigger>
+                                    <MenuPopup align="end" side="top">
+                                      <MenuItem
+                                        disabled={isSendBusy || isConnecting}
+                                        onClick={() => void onImplementPlanInNewThread()}
+                                      >
+                                        Implement in a new thread
+                                      </MenuItem>
+                                    </MenuPopup>
+                                  </Menu>
+                                </div>
+                              )
+                            ) : (
+                              <button
+                                type="submit"
+                                className="flex h-9 w-9 enabled:cursor-pointer items-center justify-center rounded-full bg-primary/90 text-primary-foreground transition-all duration-150 hover:bg-primary hover:scale-105 disabled:pointer-events-none disabled:opacity-30 disabled:hover:scale-100 sm:h-8 sm:w-8"
+                                disabled={
+                                  isSendBusy ||
+                                  isConnecting ||
+                                  !composerSendState.hasSendableContent
+                                }
+                                aria-label={
+                                  isConnecting
+                                    ? "Connecting"
+                                    : isPreparingWorktree
+                                      ? "Preparing worktree"
+                                      : isSendBusy
+                                        ? "Sending"
+                                        : "Send message"
+                                }
+                              >
+                                {isConnecting || isSendBusy ? (
+                                  <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 14 14"
+                                    fill="none"
+                                    className="animate-spin"
+                                    aria-hidden="true"
+                                  >
+                                    <circle
+                                      cx="7"
+                                      cy="7"
+                                      r="5.5"
+                                      stroke="currentColor"
+                                      strokeWidth="1.5"
+                                      strokeLinecap="round"
+                                      strokeDasharray="20 12"
+                                    />
+                                  </svg>
+                                ) : (
+                                  <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 14 14"
+                                    fill="none"
+                                    aria-hidden="true"
+                                  >
+                                    <path
+                                      d="M7 11.5V2.5M7 2.5L3 6.5M7 2.5L11 6.5"
+                                      stroke="currentColor"
+                                      strokeWidth="1.8"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />
+                                  </svg>
+                                )}
+                              </button>
+                            )
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -4232,43 +4289,42 @@ export default function ChatView({ threadId }: ChatViewProps) {
               </div>
             </form>
           </div>
-          {isElectron
-            ? null
-            : (
-              <div className="border-t border-border/60 px-3 py-2 sm:px-5">
-                <ChatHeader
-                  className="justify-start"
-                  activeThreadId={activeThread.id}
-                  activeProjectName={activeProject?.name}
-                  isGitRepo={isGitRepo}
-                  openInCwd={gitCwd}
-                  activeProjectScripts={activeProject?.scripts}
-                  preferredScriptId={
-                    activeProject ? (lastInvokedScriptByProjectId[activeProject.id] ?? null) : null
-                  }
-                  keybindings={keybindings}
-                  availableEditors={availableEditors}
-                  showProjectScripts
-                  showOpenInPicker
-                  showGitActions
-                  terminalAvailable={activeProject !== undefined}
-                  terminalOpen={terminalState.terminalOpen}
-                  showTerminalToggle
-                  terminalToggleShortcutLabel={terminalToggleShortcutLabel}
-                  diffToggleShortcutLabel={diffPanelShortcutLabel}
-                  gitCwd={gitCwd}
-                  diffOpen={diffOpen}
-                  onRunProjectScript={(script) => {
-                    void runProjectScript(script);
-                  }}
-                  onAddProjectScript={saveProjectScript}
-                  onUpdateProjectScript={updateProjectScript}
-                  onDeleteProjectScript={deleteProjectScript}
-                  onToggleTerminal={toggleTerminalVisibility}
-                  onToggleDiff={onToggleDiff}
-                />
-              </div>
-            )}
+          {isElectron ? null : (
+            <div className="border-t border-border/60 px-3 py-2 sm:px-5">
+              <ChatHeader
+                className="justify-start"
+                activeThreadId={activeThread.id}
+                activeProjectName={activeProject?.name}
+                activeProject={activeProject}
+                isGitRepo={isGitRepo}
+                openInCwd={gitCwd}
+                activeProjectScripts={activeProject?.scripts}
+                preferredScriptId={
+                  activeProject ? (lastInvokedScriptByProjectId[activeProject.id] ?? null) : null
+                }
+                keybindings={keybindings}
+                availableEditors={availableEditors}
+                showProjectScripts
+                showOpenInPicker
+                showGitActions
+                terminalAvailable={activeProject !== undefined}
+                terminalOpen={terminalState.terminalOpen}
+                showTerminalToggle
+                terminalToggleShortcutLabel={terminalToggleShortcutLabel}
+                diffToggleShortcutLabel={diffPanelShortcutLabel}
+                gitCwd={gitCwd}
+                diffOpen={diffOpen}
+                onRunProjectScript={(script) => {
+                  void runProjectScript(script);
+                }}
+                onAddProjectScript={saveProjectScript}
+                onUpdateProjectScript={updateProjectScript}
+                onDeleteProjectScript={deleteProjectScript}
+                onToggleTerminal={toggleTerminalVisibility}
+                onToggleDiff={onToggleDiff}
+              />
+            </div>
+          )}
 
           {isGitRepo && (
             <BranchToolbar

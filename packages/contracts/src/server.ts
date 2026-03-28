@@ -3,7 +3,7 @@ import { IsoDateTime, TrimmedNonEmptyString } from "./baseSchemas";
 import { KeybindingRule, ResolvedKeybindingsConfig } from "./keybindings";
 import { EditorId } from "./editor";
 import { ModelCapabilities } from "./model";
-import { ProviderKind } from "./orchestration";
+import { ProjectKnowledgeSource, ProjectMcpServerTransport, ProviderKind } from "./orchestration";
 import { ServerSettings } from "./settings";
 
 const KeybindingsMalformedConfigIssue = Schema.Struct({
@@ -88,3 +88,52 @@ export const ServerProviderUpdatedPayload = Schema.Struct({
   providers: ServerProviders,
 });
 export type ServerProviderUpdatedPayload = typeof ServerProviderUpdatedPayload.Type;
+
+export const ServerInspectMcpServerInput = Schema.Struct({
+  transport: ProjectMcpServerTransport,
+  url: TrimmedNonEmptyString,
+});
+export type ServerInspectMcpServerInput = typeof ServerInspectMcpServerInput.Type;
+
+export const ServerMcpTool = Schema.Struct({
+  name: TrimmedNonEmptyString,
+  description: Schema.optional(TrimmedNonEmptyString),
+  inputSchema: Schema.optional(Schema.Unknown),
+});
+export type ServerMcpTool = typeof ServerMcpTool.Type;
+
+export const ServerMcpResource = Schema.Struct({
+  uri: TrimmedNonEmptyString,
+  name: TrimmedNonEmptyString,
+  description: Schema.optional(TrimmedNonEmptyString),
+  mimeType: Schema.optional(TrimmedNonEmptyString),
+});
+export type ServerMcpResource = typeof ServerMcpResource.Type;
+
+export const ServerInspectMcpServerResult = Schema.Struct({
+  serverName: TrimmedNonEmptyString,
+  serverVersion: Schema.optional(TrimmedNonEmptyString),
+  instructions: Schema.optional(TrimmedNonEmptyString),
+  tools: Schema.Array(ServerMcpTool),
+  resources: Schema.Array(ServerMcpResource),
+});
+export type ServerInspectMcpServerResult = typeof ServerInspectMcpServerResult.Type;
+
+export const ServerResolveKnowledgeSourcesInput = Schema.Struct({
+  sources: Schema.Array(ProjectKnowledgeSource),
+});
+export type ServerResolveKnowledgeSourcesInput = typeof ServerResolveKnowledgeSourcesInput.Type;
+
+export const ServerResolvedKnowledgeSource = Schema.Struct({
+  sourceId: TrimmedNonEmptyString,
+  name: TrimmedNonEmptyString,
+  url: TrimmedNonEmptyString,
+  content: TrimmedNonEmptyString,
+  truncated: Schema.Boolean,
+});
+export type ServerResolvedKnowledgeSource = typeof ServerResolvedKnowledgeSource.Type;
+
+export const ServerResolveKnowledgeSourcesResult = Schema.Struct({
+  entries: Schema.Array(ServerResolvedKnowledgeSource),
+});
+export type ServerResolveKnowledgeSourcesResult = typeof ServerResolveKnowledgeSourcesResult.Type;

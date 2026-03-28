@@ -17,7 +17,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
-const APP_DISPLAY_NAME = isDevelopment ? "MedusaJS Code (Dev)" : "MedusaJS Code (Alpha)";
+const APP_DISPLAY_NAME = isDevelopment ? "MedusaJS Code (Dev)" : "MedusaJS Code";
 const APP_BUNDLE_ID = "com.medusajs.code";
 const LAUNCHER_VERSION = 1;
 

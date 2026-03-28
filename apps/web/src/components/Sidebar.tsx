@@ -9,14 +9,7 @@ import {
   TriangleAlertIcon,
 } from "lucide-react";
 import { autoAnimate } from "@formkit/auto-animate";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type MouseEvent,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import {
   DndContext,
   type DragCancelEvent,
@@ -1833,7 +1826,9 @@ export default function Sidebar() {
                         <SquarePenIcon className="size-3.5" />
                       </TooltipTrigger>
                       <TooltipPopup side="right">
-                        {newThreadShortcutLabel ? `New chat (${newThreadShortcutLabel})` : "New chat"}
+                        {newThreadShortcutLabel
+                          ? `New chat (${newThreadShortcutLabel})`
+                          : "New chat"}
                       </TooltipPopup>
                     </Tooltip>
                   ) : null}
@@ -1949,14 +1944,15 @@ export default function Sidebar() {
             </div>
           )}
 
-          {!shouldShowActiveProjectOnly && visibleProjects.length === 0 && !shouldShowProjectPathEntry && (
-            <div className="px-2 pt-4 text-center text-xs text-muted-foreground/60">
-              No projects yet
-            </div>
-          )}
+          {!shouldShowActiveProjectOnly &&
+            visibleProjects.length === 0 &&
+            !shouldShowProjectPathEntry && (
+              <div className="px-2 pt-4 text-center text-xs text-muted-foreground/60">
+                No projects yet
+              </div>
+            )}
         </SidebarGroup>
       </SidebarContent>
-
     </>
   );
 }

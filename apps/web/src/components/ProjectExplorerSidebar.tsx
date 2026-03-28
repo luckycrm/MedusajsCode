@@ -1,7 +1,8 @@
-import { ChevronRightIcon, FolderIcon, PanelLeftCloseIcon, PanelLeftIcon } from "lucide-react";
+import { ChevronRightIcon, PanelLeftCloseIcon, PanelLeftIcon } from "lucide-react";
 import {
   createContext,
   type PointerEvent as ReactPointerEvent,
+  Fragment,
   type ReactNode,
   useCallback,
   useContext,
@@ -14,18 +15,21 @@ import { Schema } from "effect";
 import { type ProjectEntry } from "@mctools/contracts";
 import { useQueries } from "@tanstack/react-query";
 
+import { isElectron } from "../env";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { getLocalStorageItem, setLocalStorageItem } from "../hooks/useLocalStorage";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { projectQueryKeys } from "../lib/projectReactQuery";
+import { cn } from "../lib/utils";
 import { readNativeApi } from "../nativeApi";
 import { useStore } from "../store";
+import GitActionsControl from "./GitActionsControl";
+import { useProjectFileEditor } from "./ProjectFileEditor";
 import { VscodeEntryIcon } from "./chat/VscodeEntryIcon";
+import { toastManager } from "./ui/toast";
 import { Button } from "./ui/button";
 import { Sheet, SheetPopup } from "./ui/sheet";
-import {
-  SidebarContent,
-  SidebarGroup,
-} from "./ui/sidebar";
+import { SidebarContent, SidebarGroup } from "./ui/sidebar";
 
 const ROOT_DIRECTORY_PATH = "__root__";
 const PROJECT_EXPLORER_WIDTH_STORAGE_KEY = "project_explorer_sidebar_width";
@@ -103,12 +107,16 @@ export function ProjectExplorerTrigger({ className = "size-7 shrink-0" }: { clas
       type="button"
       variant="ghost"
       size="icon"
-      className={className}
+      className={cn(className, (isDesktop ? !desktopCollapsed : mobileOpen) ? "text-primary" : "")}
       aria-label="Toggle explorer"
       onClick={toggle}
     >
       {isDesktop ? (
-        desktopCollapsed ? <PanelLeftIcon className="size-4" /> : <PanelLeftCloseIcon className="size-4" />
+        desktopCollapsed ? (
+          <PanelLeftIcon className="size-4" />
+        ) : (
+          <PanelLeftCloseIcon className="size-4" />
+        )
       ) : mobileOpen ? (
         <PanelLeftCloseIcon className="size-4" />
       ) : (
@@ -118,9 +126,10 @@ export function ProjectExplorerTrigger({ className = "size-7 shrink-0" }: { clas
   );
 }
 
-export default function ProjectExplorerSidebar() {
+export default function ProjectExplorerSidebar({ topControls }: { topControls?: ReactNode }) {
   const projects = useStore((store) => store.projects);
   const { activeDraftThread, activeThread } = useHandleNewThread();
+  const { activeFile, openFile } = useProjectFileEditor();
   const { desktopCollapsed, mobileOpen, setMobileOpen } = useProjectExplorer();
   const [desktopWidth, setDesktopWidth] = useState(() => {
     const storedWidth = getLocalStorageItem(PROJECT_EXPLORER_WIDTH_STORAGE_KEY, Schema.Finite);
@@ -158,7 +167,10 @@ export default function ProjectExplorerSidebar() {
 
   const explorerDirectoryQueries = useQueries({
     queries: explorerDirectoryPaths.map((directoryPath) => ({
-      queryKey: ["project-directory", activeProject?.cwd ?? null, directoryPath],
+      queryKey: projectQueryKeys.listDirectory(
+        activeProject?.cwd ?? null,
+        directoryPath === ROOT_DIRECTORY_PATH ? null : directoryPath,
+      ),
       queryFn: async () => {
         const api = readNativeApi();
         if (!api || !activeProject) {
@@ -207,6 +219,35 @@ export default function ProjectExplorerSidebar() {
       return next;
     });
   }, []);
+
+  const openExplorerFile = useCallback(
+    async (entryPath: string) => {
+      if (!activeProject) {
+        toastManager.add({
+          type: "error",
+          title: "Unable to open file",
+          description: "No active project is available.",
+        });
+        return;
+      }
+
+      try {
+        await openFile({
+          cwd: activeProject.cwd,
+          projectName: activeProject.name,
+          relativePath: entryPath.replace(/^\/+/, ""),
+        });
+        setMobileOpen(false);
+      } catch (error) {
+        toastManager.add({
+          type: "error",
+          title: "Unable to open file",
+          description: error instanceof Error ? error.message : "Failed to open file in editor.",
+        });
+      }
+    },
+    [activeProject, openFile, setMobileOpen],
+  );
 
   useEffect(() => {
     setExpandedDirectories(new Set([ROOT_DIRECTORY_PATH]));
@@ -265,16 +306,19 @@ export default function ProjectExplorerSidebar() {
     };
   }, [commitDesktopWidth, desktopWidth]);
 
-  const handleResizeStart = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    resizeStateRef.current = {
-      startX: event.clientX,
-      startWidth: desktopWidth,
-    };
-    document.body.style.setProperty("cursor", "col-resize");
-    document.body.style.setProperty("user-select", "none");
-  }, [desktopWidth]);
+  const handleResizeStart = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      resizeStateRef.current = {
+        startX: event.clientX,
+        startWidth: desktopWidth,
+      };
+      document.body.style.setProperty("cursor", "col-resize");
+      document.body.style.setProperty("user-select", "none");
+    },
+    [desktopWidth],
+  );
 
   function renderExplorerTree(parentPath: string, depth = 0): ReactNode {
     const entries = explorerEntriesByParentPath.get(parentPath) ?? [];
@@ -282,17 +326,28 @@ export default function ProjectExplorerSidebar() {
       const isDirectory = entry.kind === "directory";
       const isExpanded = isDirectory && expandedDirectories.has(entry.path);
       const entryName = entry.path.split("/").at(-1) ?? entry.path;
+      const isActiveFile =
+        !isDirectory &&
+        activeFile?.cwd === activeProject?.cwd &&
+        activeFile?.relativePath === entry.path.replace(/^\/+/, "");
 
       return (
         <div key={entry.path}>
           <div
-            className="flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className={cn(
+              "group flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-[12px] transition-colors",
+              isActiveFile
+                ? "bg-accent text-foreground"
+                : "text-muted-foreground hover:bg-accent/70 hover:text-foreground",
+            )}
             style={{ paddingLeft: `${12 + depth * 14}px` }}
           >
             <button
               type="button"
               className="inline-flex w-3 shrink-0 items-center justify-center"
-              aria-label={isDirectory ? `${isExpanded ? "Collapse" : "Expand"} ${entryName}` : undefined}
+              aria-label={
+                isDirectory ? `${isExpanded ? "Collapse" : "Expand"} ${entryName}` : undefined
+              }
               onClick={() => {
                 if (isDirectory) {
                   toggleDirectory(entry.path);
@@ -301,20 +356,26 @@ export default function ProjectExplorerSidebar() {
             >
               {isDirectory ? (
                 <ChevronRightIcon
-                  className={`size-3 text-muted-foreground/70 transition-transform ${
-                    isExpanded ? "rotate-90" : ""
-                  }`}
+                  className={`size-3 transition-transform ${isExpanded ? "rotate-90" : ""}`}
                 />
               ) : null}
             </button>
-            <VscodeEntryIcon pathValue={entry.path} kind={entry.kind} theme={explorerTheme} />
+            <VscodeEntryIcon
+              pathValue={entry.path}
+              kind={entry.kind}
+              theme={explorerTheme}
+              desaturate={isDirectory}
+              className="size-4"
+            />
             <button
               type="button"
               className="min-w-0 flex-1 truncate text-left"
               onClick={() => {
                 if (isDirectory) {
                   toggleDirectory(entry.path);
+                  return;
                 }
+                void openExplorerFile(entry.path);
               }}
             >
               {entryName}
@@ -332,15 +393,25 @@ export default function ProjectExplorerSidebar() {
 
   const explorerContent = (
     <>
-      <div className="flex items-center justify-between border-b border-border px-4 py-2">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
-          Explorer
-        </span>
-      </div>
-
       <SidebarContent className="gap-0">
-        <SidebarGroup className="gap-0 p-2">
-          <div className="flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-xs font-medium text-foreground/90 transition-colors hover:bg-accent">
+        <SidebarGroup className="gap-1 p-2">
+          {activeThread || topControls ? (
+            <div className="flex flex-wrap items-center gap-2 px-1 pb-2">
+              {activeThread ? (
+                <GitActionsControl
+                  gitCwd={activeProject.cwd}
+                  activeThreadId={activeThread.id}
+                  mode="full"
+                  forceExpanded
+                />
+              ) : null}
+              {topControls ? <Fragment>{topControls}</Fragment> : null}
+            </div>
+          ) : null}
+          <div className="px-2 pb-1 text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground/55">
+            {activeProject.name}
+          </div>
+          <div className="group flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-[12px] font-medium text-foreground/90 transition-colors hover:bg-accent/70">
             <button
               type="button"
               className="inline-flex w-3 shrink-0 items-center justify-center"
@@ -350,12 +421,18 @@ export default function ProjectExplorerSidebar() {
               }}
             >
               <ChevronRightIcon
-                className={`size-3 shrink-0 text-muted-foreground/70 transition-transform ${
+                className={`size-3 shrink-0 transition-transform ${
                   expandedDirectories.has(ROOT_DIRECTORY_PATH) ? "rotate-90" : ""
                 }`}
               />
             </button>
-            <FolderIcon className="size-4 shrink-0 text-muted-foreground/80" />
+            <VscodeEntryIcon
+              pathValue={`${activeProject.name}/`}
+              kind="directory"
+              theme={explorerTheme}
+              desaturate
+              className="size-4"
+            />
             <button
               type="button"
               className="min-w-0 flex-1 truncate text-left"
@@ -368,7 +445,7 @@ export default function ProjectExplorerSidebar() {
           </div>
 
           {expandedDirectories.has(ROOT_DIRECTORY_PATH) ? (
-            <div className="space-y-0.5">
+            <div className="space-y-0.5 rounded-lg border border-border/60 bg-background/60 p-1">
               {renderExplorerTree(ROOT_DIRECTORY_PATH)}
               {!isExplorerLoading &&
               (explorerEntriesByParentPath.get(ROOT_DIRECTORY_PATH)?.length ?? 0) === 0 ? (
@@ -378,16 +455,17 @@ export default function ProjectExplorerSidebar() {
           ) : null}
         </SidebarGroup>
       </SidebarContent>
-
     </>
   );
 
   return (
     <>
       <aside
-        className={`relative hidden h-full min-h-0 shrink-0 overflow-hidden border-r border-border bg-card text-foreground lg:flex lg:flex-col ${
-          desktopCollapsed ? "lg:hidden" : ""
-        }`}
+        className={cn(
+          "relative hidden min-h-0 shrink-0 overflow-hidden border-r border-border bg-card text-foreground lg:flex lg:flex-col",
+          isElectron ? "h-[calc(100svh-92px)]" : "h-svh",
+          desktopCollapsed && "lg:hidden",
+        )}
         style={{ width: `${desktopWidth}px` }}
       >
         {explorerContent}
@@ -404,7 +482,10 @@ export default function ProjectExplorerSidebar() {
         <SheetPopup
           side="left"
           showCloseButton={false}
-          className="w-[min(88vw,360px)] max-w-[360px] border-r border-border bg-card p-0 text-foreground lg:hidden"
+          className={cn(
+            "w-[min(88vw,360px)] max-w-[360px] border-r border-border bg-card p-0 text-foreground lg:hidden",
+            isElectron ? "h-[calc(100svh-92px)]" : "h-svh",
+          )}
         >
           <div className="flex min-h-0 h-full flex-col">{explorerContent}</div>
         </SheetPopup>

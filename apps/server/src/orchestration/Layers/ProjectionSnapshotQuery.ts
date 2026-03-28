@@ -6,7 +6,10 @@ import {
   OrchestrationCheckpointFile,
   OrchestrationProposedPlanId,
   OrchestrationReadModel,
+  ProjectKnowledgeSource,
+  ProjectMcpServer,
   ProjectScript,
+  ProjectSkill,
   ThreadId,
   TurnId,
   type OrchestrationCheckpointSummary,
@@ -48,6 +51,9 @@ const ProjectionProjectDbRowSchema = ProjectionProject.mapFields(
   Struct.assign({
     defaultModelSelection: Schema.NullOr(Schema.fromJsonString(ModelSelection)),
     scripts: Schema.fromJsonString(Schema.Array(ProjectScript)),
+    skills: Schema.fromJsonString(Schema.Array(ProjectSkill)),
+    knowledgeSources: Schema.fromJsonString(Schema.Array(ProjectKnowledgeSource)),
+    mcpServers: Schema.fromJsonString(Schema.Array(ProjectMcpServer)),
   }),
 );
 const ProjectionThreadMessageDbRowSchema = ProjectionThreadMessage.mapFields(
@@ -149,6 +155,9 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           workspace_root AS "workspaceRoot",
           default_model_selection_json AS "defaultModelSelection",
           scripts_json AS "scripts",
+          skills_json AS "skills",
+          knowledge_sources_json AS "knowledgeSources",
+          mcp_servers_json AS "mcpServers",
           created_at AS "createdAt",
           updated_at AS "updatedAt",
           deleted_at AS "deletedAt"
@@ -543,6 +552,9 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
             workspaceRoot: row.workspaceRoot,
             defaultModelSelection: row.defaultModelSelection,
             scripts: row.scripts,
+            skills: row.skills,
+            knowledgeSources: row.knowledgeSources,
+            mcpServers: row.mcpServers,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
             deletedAt: row.deletedAt,

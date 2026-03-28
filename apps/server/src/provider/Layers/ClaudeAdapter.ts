@@ -8,6 +8,7 @@
  */
 import {
   type CanUseTool,
+  type McpServerConfig,
   query,
   type Options as ClaudeQueryOptions,
   type PermissionMode,
@@ -24,6 +25,7 @@ import {
   type CanonicalRequestType,
   EventId,
   type ProviderApprovalDecision,
+  type ProjectMcpServer,
   ProviderItemId,
   type ProviderRuntimeEvent,
   type ProviderRuntimeTurnStatus,
@@ -220,6 +222,22 @@ function getEffectiveClaudeCodeEffort(
     return null;
   }
   return effort === "ultrathink" ? null : effort;
+}
+
+function buildClaudeMcpServers(
+  mcpServers: ReadonlyArray<ProjectMcpServer> | undefined,
+): Record<string, McpServerConfig> | undefined {
+  if (!Array.isArray(mcpServers) || mcpServers.length === 0) {
+    return undefined;
+  }
+
+  const entries = mcpServers.flatMap((server) =>
+    server.transport === "streamable-http"
+      ? ([[server.id, { type: "http" as const, url: server.url }]] as const)
+      : [],
+  );
+
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
 function isClaudeInterruptedMessage(message: string): boolean {
@@ -2698,6 +2716,7 @@ const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         ...(typeof thinking === "boolean" ? { alwaysThinkingEnabled: thinking } : {}),
         ...(fastMode ? { fastMode: true } : {}),
       };
+      const mcpServers = buildClaudeMcpServers(input.mcpServers);
 
       const queryOptions: ClaudeQueryOptions = {
         ...(input.cwd ? { cwd: input.cwd } : {}),
@@ -2710,6 +2729,7 @@ const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
           ? { allowDangerouslySkipPermissions: true }
           : {}),
         ...(Object.keys(settings).length > 0 ? { settings } : {}),
+        ...(mcpServers ? { mcpServers } : {}),
         ...(existingResumeSessionId ? { resume: existingResumeSessionId } : {}),
         ...(newSessionId ? { sessionId: newSessionId } : {}),
         includePartialMessages: true,

@@ -768,6 +768,37 @@ describe("deriveWorkLogEntries", () => {
     ]);
   });
 
+  it("extracts MCP tool result previews from completed tool payloads", () => {
+    const activities: OrchestrationThreadActivity[] = [
+      makeActivity({
+        id: "mcp-tool",
+        kind: "tool.completed",
+        summary: "MCP tool call completed",
+        payload: {
+          itemType: "mcp_tool_call",
+          title: "MCP tool call",
+          detail: "ask_medusa_question",
+          data: {
+            item: {
+              result: {
+                content: [
+                  {
+                    type: "text",
+                    text: "Medusa provides llms.txt, llms-full.txt, and markdown pages via index.html.md.",
+                  },
+                ],
+              },
+            },
+          },
+        },
+      }),
+    ];
+
+    const [entry] = deriveWorkLogEntries(activities, undefined);
+    expect(entry?.resultPreview).toContain("llms.txt");
+    expect(entry?.resultPreview).toContain("index.html.md");
+  });
+
   it("collapses repeated lifecycle updates for the same tool call into one entry", () => {
     const activities: OrchestrationThreadActivity[] = [
       makeActivity({

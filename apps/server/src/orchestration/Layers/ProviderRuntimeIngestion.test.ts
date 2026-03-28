@@ -1925,6 +1925,57 @@ describe("ProviderRuntimeIngestion", () => {
     expect(checkpoint?.checkpointRef).toBe("provider-diff:evt-turn-diff-updated");
   });
 
+  it("preserves completed tool data in projected thread activities", async () => {
+    const harness = await createHarness();
+    const now = new Date().toISOString();
+
+    harness.emit({
+      type: "item.completed",
+      eventId: asEventId("evt-item-completed"),
+      provider: "codex",
+      createdAt: now,
+      threadId: asThreadId("thread-1"),
+      turnId: asTurnId("turn-complete"),
+      itemId: asItemId("item-mcp"),
+      payload: {
+        itemType: "mcp_tool_call",
+        title: "MCP tool call",
+        detail: "ask_medusa_question",
+        data: {
+          item: {
+            result: {
+              content: [{ type: "text", text: "Medusa docs answer" }],
+            },
+          },
+        },
+      },
+    });
+
+    const thread = await waitForThread(harness.engine, (entry) =>
+      entry.activities.some(
+        (activity: ProviderRuntimeTestActivity) => activity.id === "evt-item-completed",
+      ),
+    );
+
+    const toolCompleted = thread.activities.find(
+      (activity: ProviderRuntimeTestActivity) => activity.id === "evt-item-completed",
+    );
+    const toolCompletedPayload =
+      toolCompleted?.payload && typeof toolCompleted.payload === "object"
+        ? (toolCompleted.payload as Record<string, unknown>)
+        : undefined;
+
+    expect(toolCompleted?.kind).toBe("tool.completed");
+    expect(toolCompletedPayload?.itemType).toBe("mcp_tool_call");
+    expect(toolCompletedPayload?.data).toMatchObject({
+      item: {
+        result: {
+          content: [{ type: "text", text: "Medusa docs answer" }],
+        },
+      },
+    });
+  });
+
   it("projects context window updates into normalized thread activities", async () => {
     const harness = await createHarness();
     const now = new Date().toISOString();

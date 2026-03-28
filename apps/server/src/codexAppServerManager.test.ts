@@ -351,7 +351,7 @@ describe("startSession", () => {
       clientInfo: {
         name: "medusajscode_desktop",
         title: "MedusaJS Code Desktop",
-        version: "0.1.0",
+        version: "0.2.0",
       },
       capabilities: {
         experimentalApi: true,

@@ -6,11 +6,15 @@
  *
  * @module CodexAdapterLive
  */
+import * as NodeFileSystem from "node:fs/promises";
+import * as OS from "node:os";
+import path from "node:path";
 import {
   type CanonicalItemType,
   type CanonicalRequestType,
   type ProviderEvent,
   type ProviderRuntimeEvent,
+  type ProjectMcpServer,
   type ThreadTokenUsageSnapshot,
   type ProviderUserInputAnswers,
   RuntimeItemId,
@@ -172,6 +176,20 @@ function toTurnStatus(value: unknown): "completed" | "failed" | "cancelled" | "i
     default:
       return "completed";
   }
+}
+
+function codexMcpServerSectionName(server: ProjectMcpServer): string {
+  return `medusajscode_${server.id.replace(/[^a-zA-Z0-9_-]+/g, "_")}`;
+}
+
+function renderCodexMcpConfig(mcpServers: ReadonlyArray<ProjectMcpServer>): string {
+  return mcpServers
+    .filter((server) => server.transport === "streamable-http")
+    .map(
+      (server) =>
+        `[mcp_servers.${codexMcpServerSectionName(server)}]\nurl = ${JSON.stringify(server.url)}`,
+    )
+    .join("\n\n");
 }
 
 function normalizeItemType(raw: unknown): string {
@@ -1359,6 +1377,101 @@ const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
     }),
   );
   const serverSettingsService = yield* ServerSettingsService;
+  const codexOverlayHomeByThreadId = new Map<ThreadId, string>();
+  const codexOverlayHomes = new Set<string>();
+
+  const removeCodexOverlayHome = (threadId: ThreadId) =>
+    Effect.tryPromise({
+      try: async () => {
+        const overlayHome = codexOverlayHomeByThreadId.get(threadId);
+        if (!overlayHome) {
+          return;
+        }
+        codexOverlayHomeByThreadId.delete(threadId);
+        codexOverlayHomes.delete(overlayHome);
+        await NodeFileSystem.rm(overlayHome, { recursive: true, force: true });
+      },
+      catch: () => undefined,
+    }).pipe(Effect.ignore);
+
+  const removeAllCodexOverlayHomes = Effect.tryPromise({
+    try: async () => {
+      const homes = Array.from(codexOverlayHomes);
+      codexOverlayHomeByThreadId.clear();
+      codexOverlayHomes.clear();
+      await Promise.all(
+        homes.map((overlayHome) =>
+          NodeFileSystem.rm(overlayHome, { recursive: true, force: true }).catch(() => undefined),
+        ),
+      );
+    },
+    catch: () => undefined,
+  }).pipe(Effect.ignore);
+  yield* Effect.addFinalizer(() => removeAllCodexOverlayHomes);
+
+  const prepareCodexHomePath = Effect.fn("prepareCodexHomePath")(function* (input: {
+    readonly threadId: ThreadId;
+    readonly configuredHomePath: string;
+    readonly mcpServers: ReadonlyArray<ProjectMcpServer> | undefined;
+  }) {
+    if (!input.mcpServers || input.mcpServers.length === 0) {
+      return input.configuredHomePath.trim().length > 0 ? input.configuredHomePath : undefined;
+    }
+
+    const renderedMcpConfig = renderCodexMcpConfig(input.mcpServers);
+    if (renderedMcpConfig.trim().length === 0) {
+      return input.configuredHomePath.trim().length > 0 ? input.configuredHomePath : undefined;
+    }
+
+    const baseHomePath =
+      input.configuredHomePath.trim().length > 0
+        ? input.configuredHomePath
+        : path.join(OS.homedir(), ".codex");
+    const overlayHome = path.join(
+      serverConfig.stateDir,
+      "codex-mcp-homes",
+      `${input.threadId}-${crypto.randomUUID()}`,
+    );
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        await NodeFileSystem.mkdir(path.dirname(overlayHome), { recursive: true });
+        await NodeFileSystem.mkdir(overlayHome, { recursive: true });
+        await NodeFileSystem.cp(baseHomePath, overlayHome, { recursive: true, force: true }).catch(
+          (error: NodeJS.ErrnoException) => {
+            if (error.code !== "ENOENT") {
+              throw error;
+            }
+          },
+        );
+
+        const configPath = path.join(overlayHome, "config.toml");
+        const existingConfig = await NodeFileSystem.readFile(configPath, "utf8").catch(
+          (error: NodeJS.ErrnoException) => {
+            if (error.code === "ENOENT") {
+              return "";
+            }
+            throw error;
+          },
+        );
+        const nextConfig = existingConfig.trimEnd().length
+          ? `${existingConfig.trimEnd()}\n\n${renderedMcpConfig}\n`
+          : `${renderedMcpConfig}\n`;
+
+        await NodeFileSystem.writeFile(configPath, nextConfig, "utf8");
+        codexOverlayHomes.add(overlayHome);
+        codexOverlayHomeByThreadId.set(input.threadId, overlayHome);
+        return overlayHome;
+      },
+      catch: (cause) =>
+        new ProviderAdapterProcessError({
+          provider: PROVIDER,
+          threadId: input.threadId,
+          detail: toMessage(cause, "Failed to prepare Codex MCP configuration."),
+          cause,
+        }),
+    });
+  });
 
   const startSession: CodexAdapterShape["startSession"] = Effect.fn("startSession")(
     function* (input) {
@@ -1383,7 +1496,11 @@ const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
         ),
       );
       const binaryPath = codexSettings.binaryPath;
-      const homePath = codexSettings.homePath;
+      const homePath = yield* prepareCodexHomePath({
+        threadId: input.threadId,
+        configuredHomePath: codexSettings.homePath,
+        mcpServers: input.mcpServers,
+      });
       const managerInput: CodexAppServerStartSessionInput = {
         threadId: input.threadId,
         provider: "codex",
@@ -1541,7 +1658,7 @@ const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
   const stopSession: CodexAdapterShape["stopSession"] = (threadId) =>
     Effect.sync(() => {
       manager.stopSession(threadId);
-    });
+    }).pipe(Effect.ensuring(removeCodexOverlayHome(threadId)));
 
   const listSessions: CodexAdapterShape["listSessions"] = () =>
     Effect.sync(() => manager.listSessions());
@@ -1552,7 +1669,7 @@ const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
   const stopAll: CodexAdapterShape["stopAll"] = () =>
     Effect.sync(() => {
       manager.stopAll();
-    });
+    }).pipe(Effect.ensuring(removeAllCodexOverlayHomes));
 
   const runtimeEventQueue = yield* Queue.unbounded<ProviderRuntimeEvent>();
 

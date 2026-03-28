@@ -140,12 +140,52 @@ export const ProjectScript = Schema.Struct({
 });
 export type ProjectScript = typeof ProjectScript.Type;
 
+export const ProjectSkill = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  name: TrimmedNonEmptyString,
+  description: TrimmedNonEmptyString,
+  promptHint: TrimmedNonEmptyString,
+  referenceUrl: TrimmedNonEmptyString,
+});
+export type ProjectSkill = typeof ProjectSkill.Type;
+
+export const ProjectKnowledgeSourceKind = Schema.Literals([
+  "llms-full",
+  "page-markdown",
+  "docs-index",
+]);
+export type ProjectKnowledgeSourceKind = typeof ProjectKnowledgeSourceKind.Type;
+
+export const ProjectKnowledgeSource = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  name: TrimmedNonEmptyString,
+  description: TrimmedNonEmptyString,
+  kind: ProjectKnowledgeSourceKind,
+  url: TrimmedNonEmptyString,
+});
+export type ProjectKnowledgeSource = typeof ProjectKnowledgeSource.Type;
+
+export const ProjectMcpServerTransport = Schema.Literals(["streamable-http"]);
+export type ProjectMcpServerTransport = typeof ProjectMcpServerTransport.Type;
+
+export const ProjectMcpServer = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  name: TrimmedNonEmptyString,
+  description: TrimmedNonEmptyString,
+  transport: ProjectMcpServerTransport,
+  url: TrimmedNonEmptyString,
+});
+export type ProjectMcpServer = typeof ProjectMcpServer.Type;
+
 export const OrchestrationProject = Schema.Struct({
   id: ProjectId,
   title: TrimmedNonEmptyString,
   workspaceRoot: TrimmedNonEmptyString,
   defaultModelSelection: Schema.NullOr(ModelSelection),
-  scripts: Schema.Array(ProjectScript),
+  scripts: Schema.Array(ProjectScript).pipe(Schema.withDecodingDefault(() => [])),
+  skills: Schema.Array(ProjectSkill).pipe(Schema.withDecodingDefault(() => [])),
+  knowledgeSources: Schema.Array(ProjectKnowledgeSource).pipe(Schema.withDecodingDefault(() => [])),
+  mcpServers: Schema.Array(ProjectMcpServer).pipe(Schema.withDecodingDefault(() => [])),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
   deletedAt: Schema.NullOr(IsoDateTime),
@@ -318,6 +358,9 @@ const ProjectMetaUpdateCommand = Schema.Struct({
   workspaceRoot: Schema.optional(TrimmedNonEmptyString),
   defaultModelSelection: Schema.optional(Schema.NullOr(ModelSelection)),
   scripts: Schema.optional(Schema.Array(ProjectScript)),
+  skills: Schema.optional(Schema.Array(ProjectSkill)),
+  knowledgeSources: Schema.optional(Schema.Array(ProjectKnowledgeSource)),
+  mcpServers: Schema.optional(Schema.Array(ProjectMcpServer)),
 });
 
 const ProjectDeleteCommand = Schema.Struct({
@@ -603,7 +646,10 @@ export const ProjectCreatedPayload = Schema.Struct({
   title: TrimmedNonEmptyString,
   workspaceRoot: TrimmedNonEmptyString,
   defaultModelSelection: Schema.NullOr(ModelSelection),
-  scripts: Schema.Array(ProjectScript),
+  scripts: Schema.Array(ProjectScript).pipe(Schema.withDecodingDefault(() => [])),
+  skills: Schema.Array(ProjectSkill).pipe(Schema.withDecodingDefault(() => [])),
+  knowledgeSources: Schema.Array(ProjectKnowledgeSource).pipe(Schema.withDecodingDefault(() => [])),
+  mcpServers: Schema.Array(ProjectMcpServer).pipe(Schema.withDecodingDefault(() => [])),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
@@ -614,6 +660,9 @@ export const ProjectMetaUpdatedPayload = Schema.Struct({
   workspaceRoot: Schema.optional(TrimmedNonEmptyString),
   defaultModelSelection: Schema.optional(Schema.NullOr(ModelSelection)),
   scripts: Schema.optional(Schema.Array(ProjectScript)),
+  skills: Schema.optional(Schema.Array(ProjectSkill)),
+  knowledgeSources: Schema.optional(Schema.Array(ProjectKnowledgeSource)),
+  mcpServers: Schema.optional(Schema.Array(ProjectMcpServer)),
   updatedAt: IsoDateTime,
 });
 
