@@ -1,5 +1,20 @@
 import { ThreadId } from "@mctools/contracts";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.hoisted(() => {
+  if (typeof globalThis !== "undefined") {
+    const storeMock: Record<string, string> = {};
+    const fakeStorage = {
+      getItem: vi.fn((key: string) => storeMock[key] || null),
+      setItem: vi.fn((key: string, value: string) => { storeMock[key] = value.toString(); }),
+      removeItem: vi.fn((key: string) => { delete storeMock[key]; }),
+      clear: vi.fn(() => {
+        Object.keys(storeMock).forEach((key) => delete storeMock[key]);
+      }),
+    };
+    Object.defineProperty(globalThis, "localStorage", { value: fakeStorage, writable: true });
+  }
+});
 
 import { selectThreadTerminalState, useTerminalStateStore } from "./terminalStateStore";
 
@@ -7,9 +22,7 @@ const THREAD_ID = ThreadId.makeUnsafe("thread-1");
 
 describe("terminalStateStore actions", () => {
   beforeEach(() => {
-    if (typeof localStorage !== "undefined") {
-      localStorage.clear();
-    }
+    localStorage.clear();
     useTerminalStateStore.setState({ terminalStateByThreadId: {} });
   });
 

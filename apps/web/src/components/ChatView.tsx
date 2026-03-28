@@ -3659,7 +3659,6 @@ export default function ChatView({ threadId }: ChatViewProps) {
   }, [
     electronFooterControls,
     electronHeaderControls,
-    isElectron,
     setFooterContent,
     setHeaderContent,
   ]);

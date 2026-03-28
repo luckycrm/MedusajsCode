@@ -14,7 +14,6 @@ import { Schema } from "effect";
 import { type ProjectEntry } from "@mctools/contracts";
 import { useQueries } from "@tanstack/react-query";
 
-import { isElectron } from "../env";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { getLocalStorageItem, setLocalStorageItem } from "../hooks/useLocalStorage";
 import { useMediaQuery } from "../hooks/useMediaQuery";
@@ -75,10 +74,13 @@ export function ProjectExplorerProvider({ children }: { children: ReactNode }) {
     setMobileOpen((current) => !current);
   }, [isDesktop, persistDesktopCollapsed]);
 
+  const contextValue = useMemo(
+    () => ({ desktopCollapsed, setDesktopCollapsed, mobileOpen, setMobileOpen, toggle }),
+    [desktopCollapsed, mobileOpen, toggle],
+  );
+
   return (
-    <ProjectExplorerContext.Provider
-      value={{ desktopCollapsed, setDesktopCollapsed, mobileOpen, setMobileOpen, toggle }}
-    >
+    <ProjectExplorerContext.Provider value={contextValue}>
       {children}
     </ProjectExplorerContext.Provider>
   );

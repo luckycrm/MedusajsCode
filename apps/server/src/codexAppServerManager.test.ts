@@ -349,7 +349,7 @@ describe("startSession", () => {
   it("enables Codex experimental api capabilities during initialize", () => {
     expect(buildCodexInitializeParams()).toEqual({
       clientInfo: {
-        name: "mccode_desktop",
+        name: "medusajscode_desktop",
         title: "MedusaJS Code Desktop",
         version: "0.1.0",
       },

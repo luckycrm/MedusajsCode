@@ -18,7 +18,7 @@ const CodexTextGenerationTestLayer = CodexTextGenerationLive.pipe(
   Layer.provideMerge(ServerSettingsService.layerTest()),
   Layer.provideMerge(
     ServerConfig.layerTest(process.cwd(), {
-      prefix: "mccode-codex-text-generation-test-",
+      prefix: "medusajscode-codex-text-generation-test-",
     }),
   ),
   Layer.provideMerge(NodeServices.layer),
@@ -166,7 +166,7 @@ function withFakeCodexEnv<A, E, R>(
   return Effect.acquireUseRelease(
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
-      const tempDir = yield* fs.makeTempDirectoryScoped({ prefix: "mccode-codex-text-" });
+      const tempDir = yield* fs.makeTempDirectoryScoped({ prefix: "medusajscode-codex-text-" });
       const codexPath = yield* makeFakeCodexBinary(tempDir, input);
       const serverSettings = yield* ServerSettingsService;
       const previousSettings = yield* serverSettings.getSettings;

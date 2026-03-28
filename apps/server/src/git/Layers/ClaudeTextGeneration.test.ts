@@ -12,7 +12,7 @@ const ClaudeTextGenerationTestLayer = ClaudeTextGenerationLive.pipe(
   Layer.provideMerge(ServerSettingsService.layerTest()),
   Layer.provideMerge(
     ServerConfig.layerTest(process.cwd(), {
-      prefix: "mccode-claude-text-generation-test-",
+      prefix: "medusajscode-claude-text-generation-test-",
     }),
   ),
   Layer.provideMerge(NodeServices.layer),
@@ -77,7 +77,7 @@ function withFakeClaudeEnv<A, E, R>(
   return Effect.acquireUseRelease(
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
-      const tempDir = yield* fs.makeTempDirectoryScoped({ prefix: "mccode-claude-text-" });
+      const tempDir = yield* fs.makeTempDirectoryScoped({ prefix: "medusajscode-claude-text-" });
       const binDir = yield* makeFakeClaudeBinary(tempDir);
       const previousPath = process.env.PATH;
       const previousOutput = process.env.MC_FAKE_CLAUDE_OUTPUT;
