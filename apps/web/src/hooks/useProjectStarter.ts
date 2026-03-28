@@ -35,7 +35,7 @@ function sortThreadsByRecency<
     createdAt: string;
   },
 >(threads: readonly TThread[]): TThread[] {
-  return [...threads].sort((left, right) => {
+  return threads.toSorted((left, right) => {
     const leftTime = Date.parse(left.updatedAt ?? left.createdAt);
     const rightTime = Date.parse(right.updatedAt ?? right.createdAt);
     return rightTime - leftTime;

@@ -4,7 +4,6 @@ import {
   FolderIcon,
   GitPullRequestIcon,
   PlusIcon,
-  RocketIcon,
   SquarePenIcon,
   TerminalIcon,
   TriangleAlertIcon,
@@ -17,7 +16,6 @@ import {
   useRef,
   useState,
   type MouseEvent,
-  type ReactNode,
 } from "react";
 import {
   DndContext,
@@ -86,7 +84,6 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-  SidebarTrigger,
 } from "./ui/sidebar";
 import { useThreadSelectionStore } from "../threadSelectionStore";
 import { formatWorktreePathForDisplay, getOrphanedWorktreePathForThread } from "../worktreeCleanup";
@@ -1109,10 +1106,6 @@ export default function Sidebar() {
       appSettings.sidebarThreadSortOrder,
     );
   }, [activeProjectIdValue, appSettings.sidebarThreadSortOrder, threads]);
-  const activeProject = useMemo(
-    () => projects.find((project) => String(project.id) === activeProjectIdValue) ?? null,
-    [activeProjectIdValue, projects],
-  );
   function renderChatListOnly(projectThreads: readonly Thread[]) {
     const orderedProjectThreadIds = projectThreads.map((thread) => thread.id);
 
@@ -1661,12 +1654,6 @@ export default function Sidebar() {
     };
   }, []);
 
-  const showDesktopUpdateButton = isElectron && shouldShowDesktopUpdateButton(desktopUpdateState);
-
-  const desktopUpdateTooltip = desktopUpdateState
-    ? getDesktopUpdateButtonTooltip(desktopUpdateState)
-    : "Update available";
-
   const desktopUpdateButtonDisabled = isDesktopUpdateButtonDisabled(desktopUpdateState);
   const desktopUpdateButtonAction = desktopUpdateState
     ? resolveDesktopUpdateButtonAction(desktopUpdateState)
@@ -1677,17 +1664,6 @@ export default function Sidebar() {
     desktopUpdateState && showArm64IntelBuildWarning
       ? getArm64IntelBuildWarningDescription(desktopUpdateState)
       : null;
-  const desktopUpdateButtonInteractivityClasses = desktopUpdateButtonDisabled
-    ? "cursor-not-allowed opacity-60"
-    : "hover:bg-accent hover:text-foreground";
-  const desktopUpdateButtonClasses =
-    desktopUpdateState?.status === "downloaded"
-      ? "text-emerald-500"
-      : desktopUpdateState?.status === "downloading"
-        ? "text-sky-400"
-        : shouldHighlightDesktopUpdateError(desktopUpdateState)
-          ? "text-rose-500 animate-pulse"
-          : "text-amber-500 animate-pulse";
   const newThreadShortcutLabel =
     shortcutLabelForCommand(keybindings, "chat.newLocal") ??
     shortcutLabelForCommand(keybindings, "chat.new");

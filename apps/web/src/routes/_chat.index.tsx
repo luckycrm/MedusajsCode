@@ -49,7 +49,7 @@ function ChatIndexRouteView() {
           ...splitPath(project.cwd),
         };
       })
-      .sort((left, right) => right.lastActivity - left.lastActivity)
+      .toSorted((left, right) => right.lastActivity - left.lastActivity)
       .slice(0, 6);
   }, [projects, threads]);
 
