@@ -1,0 +1,31 @@
+{
+  "name": "@mctools/desktop",
+  "version": "0.1",
+  "private": true,
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "bun run --parallel dev:bundle dev:electron",
+    "dev:bundle": "tsdown --watch",
+    "dev:electron": "bun run scripts/dev-electron.mjs",
+    "build": "tsdown",
+    "start": "bun run scripts/start-electron.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "smoke-test": "node scripts/smoke-test.mjs"
+  },
+  "dependencies": {
+    "effect": "catalog:",
+    "electron": "0.1",
+    "electron-updater": "^6.6.2"
+  },
+  "devDependencies": {
+    "@mctools/contracts": "workspace:*",
+    "@mctools/shared": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wait-on": "^8.0.2"
+  },
+  "productName": "MedusaJS Code (Alpha)"
+}

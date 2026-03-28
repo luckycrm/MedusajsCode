@@ -1,0 +1,250 @@
+import * as NodeServices from "@effect/platform-node/NodeServices";
+import { it } from "@effect/vitest";
+import { Effect, FileSystem, Layer, Path } from "effect";
+import { expect } from "vitest";
+
+import { ServerConfig } from "../../config.ts";
+import { TextGeneration } from "../Services/TextGeneration.ts";
+import { ClaudeTextGenerationLive } from "./ClaudeTextGeneration.ts";
+import { ServerSettingsService } from "../../serverSettings.ts";
+
+const ClaudeTextGenerationTestLayer = ClaudeTextGenerationLive.pipe(
+  Layer.provideMerge(ServerSettingsService.layerTest()),
+  Layer.provideMerge(
+    ServerConfig.layerTest(process.cwd(), {
+      prefix: "mccode-claude-text-generation-test-",
+    }),
+  ),
+  Layer.provideMerge(NodeServices.layer),
+);
+
+function makeFakeClaudeBinary(dir: string) {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const binDir = path.join(dir, "bin");
+    const claudePath = path.join(binDir, "claude");
+    yield* fs.makeDirectory(binDir, { recursive: true });
+
+    yield* fs.writeFileString(
+      claudePath,
+      [
+        "#!/bin/sh",
+        'args="$*"',
+        'stdin_content="$(cat)"',
+        'if [ -n "$MC_FAKE_CLAUDE_ARGS_MUST_CONTAIN" ]; then',
+        '  printf "%s" "$args" | grep -F -- "$MC_FAKE_CLAUDE_ARGS_MUST_CONTAIN" >/dev/null || {',
+        '    printf "%s\\n" "args missing expected content" >&2',
+        "    exit 2",
+        "  }",
+        "fi",
+        'if [ -n "$MC_FAKE_CLAUDE_ARGS_MUST_NOT_CONTAIN" ]; then',
+        '  if printf "%s" "$args" | grep -F -- "$MC_FAKE_CLAUDE_ARGS_MUST_NOT_CONTAIN" >/dev/null; then',
+        '    printf "%s\\n" "args contained forbidden content" >&2',
+        "    exit 3",
+        "  fi",
+        "fi",
+        'if [ -n "$MC_FAKE_CLAUDE_STDIN_MUST_CONTAIN" ]; then',
+        '  printf "%s" "$stdin_content" | grep -F -- "$MC_FAKE_CLAUDE_STDIN_MUST_CONTAIN" >/dev/null || {',
+        '    printf "%s\\n" "stdin missing expected content" >&2',
+        "    exit 4",
+        "  }",
+        "fi",
+        'if [ -n "$MC_FAKE_CLAUDE_STDERR" ]; then',
+        '  printf "%s\\n" "$MC_FAKE_CLAUDE_STDERR" >&2',
+        "fi",
+        'printf "%s" "$MC_FAKE_CLAUDE_OUTPUT"',
+        'exit "${MC_FAKE_CLAUDE_EXIT_CODE:-0}"',
+        "",
+      ].join("\n"),
+    );
+    yield* fs.chmod(claudePath, 0o755);
+    return binDir;
+  });
+}
+
+function withFakeClaudeEnv<A, E, R>(
+  input: {
+    output: string;
+    exitCode?: number;
+    stderr?: string;
+    argsMustContain?: string;
+    argsMustNotContain?: string;
+    stdinMustContain?: string;
+  },
+  effect: Effect.Effect<A, E, R>,
+) {
+  return Effect.acquireUseRelease(
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const tempDir = yield* fs.makeTempDirectoryScoped({ prefix: "mccode-claude-text-" });
+      const binDir = yield* makeFakeClaudeBinary(tempDir);
+      const previousPath = process.env.PATH;
+      const previousOutput = process.env.MC_FAKE_CLAUDE_OUTPUT;
+      const previousExitCode = process.env.MC_FAKE_CLAUDE_EXIT_CODE;
+      const previousStderr = process.env.MC_FAKE_CLAUDE_STDERR;
+      const previousArgsMustContain = process.env.MC_FAKE_CLAUDE_ARGS_MUST_CONTAIN;
+      const previousArgsMustNotContain = process.env.MC_FAKE_CLAUDE_ARGS_MUST_NOT_CONTAIN;
+      const previousStdinMustContain = process.env.MC_FAKE_CLAUDE_STDIN_MUST_CONTAIN;
+
+      yield* Effect.sync(() => {
+        process.env.PATH = `${binDir}:${previousPath ?? ""}`;
+        process.env.MC_FAKE_CLAUDE_OUTPUT = input.output;
+
+        if (input.exitCode !== undefined) {
+          process.env.MC_FAKE_CLAUDE_EXIT_CODE = String(input.exitCode);
+        } else {
+          delete process.env.MC_FAKE_CLAUDE_EXIT_CODE;
+        }
+
+        if (input.stderr !== undefined) {
+          process.env.MC_FAKE_CLAUDE_STDERR = input.stderr;
+        } else {
+          delete process.env.MC_FAKE_CLAUDE_STDERR;
+        }
+
+        if (input.argsMustContain !== undefined) {
+          process.env.MC_FAKE_CLAUDE_ARGS_MUST_CONTAIN = input.argsMustContain;
+        } else {
+          delete process.env.MC_FAKE_CLAUDE_ARGS_MUST_CONTAIN;
+        }
+
+        if (input.argsMustNotContain !== undefined) {
+          process.env.MC_FAKE_CLAUDE_ARGS_MUST_NOT_CONTAIN = input.argsMustNotContain;
+        } else {
+          delete process.env.MC_FAKE_CLAUDE_ARGS_MUST_NOT_CONTAIN;
+        }
+
+        if (input.stdinMustContain !== undefined) {
+          process.env.MC_FAKE_CLAUDE_STDIN_MUST_CONTAIN = input.stdinMustContain;
+        } else {
+          delete process.env.MC_FAKE_CLAUDE_STDIN_MUST_CONTAIN;
+        }
+      });
+
+      return {
+        previousPath,
+        previousOutput,
+        previousExitCode,
+        previousStderr,
+        previousArgsMustContain,
+        previousArgsMustNotContain,
+        previousStdinMustContain,
+      };
+    }),
+    () => effect,
+    (previous) =>
+      Effect.sync(() => {
+        process.env.PATH = previous.previousPath;
+
+        if (previous.previousOutput === undefined) {
+          delete process.env.MC_FAKE_CLAUDE_OUTPUT;
+        } else {
+          process.env.MC_FAKE_CLAUDE_OUTPUT = previous.previousOutput;
+        }
+
+        if (previous.previousExitCode === undefined) {
+          delete process.env.MC_FAKE_CLAUDE_EXIT_CODE;
+        } else {
+          process.env.MC_FAKE_CLAUDE_EXIT_CODE = previous.previousExitCode;
+        }
+
+        if (previous.previousStderr === undefined) {
+          delete process.env.MC_FAKE_CLAUDE_STDERR;
+        } else {
+          process.env.MC_FAKE_CLAUDE_STDERR = previous.previousStderr;
+        }
+
+        if (previous.previousArgsMustContain === undefined) {
+          delete process.env.MC_FAKE_CLAUDE_ARGS_MUST_CONTAIN;
+        } else {
+          process.env.MC_FAKE_CLAUDE_ARGS_MUST_CONTAIN = previous.previousArgsMustContain;
+        }
+
+        if (previous.previousArgsMustNotContain === undefined) {
+          delete process.env.MC_FAKE_CLAUDE_ARGS_MUST_NOT_CONTAIN;
+        } else {
+          process.env.MC_FAKE_CLAUDE_ARGS_MUST_NOT_CONTAIN = previous.previousArgsMustNotContain;
+        }
+
+        if (previous.previousStdinMustContain === undefined) {
+          delete process.env.MC_FAKE_CLAUDE_STDIN_MUST_CONTAIN;
+        } else {
+          process.env.MC_FAKE_CLAUDE_STDIN_MUST_CONTAIN = previous.previousStdinMustContain;
+        }
+      }),
+  );
+}
+
+it.layer(ClaudeTextGenerationTestLayer)("ClaudeTextGenerationLive", (it) => {
+  it.effect("forwards Claude thinking settings for Haiku without passing effort", () =>
+    withFakeClaudeEnv(
+      {
+        output: JSON.stringify({
+          structured_output: {
+            subject: "Add important change",
+            body: "",
+          },
+        }),
+        argsMustContain: '--settings {"alwaysThinkingEnabled":false}',
+        argsMustNotContain: "--effort",
+      },
+      Effect.gen(function* () {
+        const textGeneration = yield* TextGeneration;
+
+        const generated = yield* textGeneration.generateCommitMessage({
+          cwd: process.cwd(),
+          branch: "feature/claude-effect",
+          stagedSummary: "M README.md",
+          stagedPatch: "diff --git a/README.md b/README.md",
+          modelSelection: {
+            provider: "claudeAgent",
+            model: "claude-haiku-4-5",
+            options: {
+              thinking: false,
+              effort: "high",
+            },
+          },
+        });
+
+        expect(generated.subject).toBe("Add important change");
+      }),
+    ),
+  );
+
+  it.effect("forwards Claude fast mode and supported effort", () =>
+    withFakeClaudeEnv(
+      {
+        output: JSON.stringify({
+          structured_output: {
+            title: "Improve orchestration flow",
+            body: "Body",
+          },
+        }),
+        argsMustContain: '--effort max --settings {"fastMode":true}',
+      },
+      Effect.gen(function* () {
+        const textGeneration = yield* TextGeneration;
+
+        const generated = yield* textGeneration.generatePrContent({
+          cwd: process.cwd(),
+          baseBranch: "main",
+          headBranch: "feature/claude-effect",
+          commitSummary: "Improve orchestration",
+          diffSummary: "1 file changed",
+          diffPatch: "diff --git a/README.md b/README.md",
+          modelSelection: {
+            provider: "claudeAgent",
+            model: "claude-opus-4-6",
+            options: {
+              effort: "max",
+              fastMode: true,
+            },
+          },
+        });
+
+        expect(generated.title).toBe("Improve orchestration flow");
+      }),
+    ),
+  );
+});

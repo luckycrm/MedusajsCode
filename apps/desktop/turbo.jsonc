@@ -1,0 +1,24 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist-electron/**"],
+    },
+    "dev": {
+      "dependsOn": ["mc#build"],
+      "persistent": true,
+    },
+    "start": {
+      "dependsOn": ["build", "@mctools/web#build", "mc#build"],
+      "cache": false,
+      "persistent": true,
+    },
+    "smoke-test": {
+      "dependsOn": ["build", "@mctools/web#build", "mc#build"],
+      "cache": false,
+      "outputs": [],
+    },
+  },
+}

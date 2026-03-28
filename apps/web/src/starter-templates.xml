@@ -1,0 +1,23 @@
+<templates>
+  <template id="nextjs-starter-medusa">
+    <name>Next.js Starter</name>
+    <description>Official Medusa storefront starter with Next.js.</description>
+    <repository>https://github.com/medusajs/nextjs-starter-medusa.git</repository>
+    <previewImage>https://opengraph.githubassets.com/1/medusajs/nextjs-starter-medusa</previewImage>
+    <tag>Storefront</tag>
+  </template>
+  <template id="b2b-starter-medusa">
+    <name>B2B Starter</name>
+    <description>Official Medusa B2B commerce starter.</description>
+    <repository>https://github.com/medusajs/b2b-starter-medusa.git</repository>
+    <previewImage>https://opengraph.githubassets.com/1/medusajs/b2b-starter-medusa</previewImage>
+    <tag>B2B</tag>
+  </template>
+  <template id="medusa-starter-default">
+    <name>Backend Starter</name>
+    <description>Official default Medusa backend starter.</description>
+    <repository>https://github.com/medusajs/medusa-starter-default.git</repository>
+    <previewImage>https://opengraph.githubassets.com/1/medusajs/medusa-starter-default</previewImage>
+    <tag>Backend</tag>
+  </template>
+</templates>
