@@ -1,7 +1,6 @@
 # MedusaJS Code
 
-MedusaJS Code is a minimal web GUI for coding agents (currently Codex and Claude, more coming soon).
-
+MedusaJS Code is an early WIP, lightning-fast desktop AI coding assistant specifically designed to help you build **high-quality MedusaJS frontends and backends** faster than ever. It acts as a minimal web GUI for powerful coding agents (currently Codex and Claude, with more coming soon), giving you predictable, reliable AI assistance tailored for real, complex Medusa codebases.
 ## How to use
 
 > [!WARNING]
